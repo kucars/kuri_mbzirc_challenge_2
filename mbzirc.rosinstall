@@ -9,7 +9,7 @@
     local-name: husky
     uri: https://github.com/k-okada/husky.git
     version: 137294a
--git:
+- git:
     local-name: kuri_mbzirc_sim
     uri: https://github.com/kuri-kustar/kuri_mbzirc_sim.git
     version: ae3cce0
