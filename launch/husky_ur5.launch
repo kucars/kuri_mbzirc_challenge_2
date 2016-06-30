@@ -15,12 +15,17 @@
     <arg name="headless" default="$(arg headless)"/>
   </include>
 
-  <arg  name="robot_initial_pose" value="-x 1.5 -y   0 -z 0.1 -Y 3.14" />
+  <arg name="laser_enabled" default="true"/>
+  <arg name="ur5_enabled" default="false"/>
+  <arg name="kinect_enabled" default="false"/>
+  <arg name="gripper_enabled" default="false"/>
+  
+  <arg  name="robot_initial_pose" value="-x 65 -y -25 -z 0.1 -Y 3.14" />
   <include file="$(find husky_gazebo)/launch/spawn_husky.launch">
-    <arg name="laser_enabled" value="false"/>
-    <arg name="kinect_enabled" value="false"/>
-    <arg name="ur5_enabled" value="false"/>
-    <arg name="gripper_enabled" value="false"/>
+    <arg name="laser_enabled" value="$(arg laser_enabled)"/>
+    <arg name="kinect_enabled" value="$(arg kinect_enabled)"/>
+    <arg name="ur5_enabled" value="$(arg ur5_enabled)"/>
+    <arg name="gripper_enabled" value="$(arg gripper_enabled)"/>
     <arg name="robot_initial_pose" value="$(arg robot_initial_pose)"/>
     <arg name="husky_gazebo_description" value="$(find kuri_mbzirc_sim)/urdf/husky_with_camera_laser.urdf.xacro"/>
   </include>
@@ -34,6 +39,7 @@
 
   <!-- Stow the arm -->
   <node pkg="husky_control" type="stow_ur5" name="stow_ur5"/>
+  <!--  <node pkg="husky_control" type="stow_ur5" name="stow_ur5"/> -->
 
   <!-- Start the pr2 gripper controller and action server -->
   <rosparam command="load" file="$(find husky_control)/config/control_gripper.yaml" />
@@ -57,6 +63,11 @@
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find kuri_mbzirc_challenge_2)/rviz/planning.rviz"/>
     <rosparam param="/husky_velocity_controller/linear/x/max_velocity">4.0</rosparam>
   </group>
+  
+  <!--- Run Move Base -->  
+  <include file="$(find husky_navigation)/launch/move_base.launch">
+    <arg name="no_static_map" value="true"/>
+  </include>
 
 </launch>
 
