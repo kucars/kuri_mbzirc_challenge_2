@@ -33,7 +33,11 @@
     <arg name="no_static_map" value="true"/>
   </include>
 
-
+  <group unless="$(arg headless)" >
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find kuri_mbzirc_challenge_2)/rviz/lol.rviz"/>
+   
+  </group>
+  
 
 
 
