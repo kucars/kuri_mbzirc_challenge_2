@@ -1,18 +1,15 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(detect_goal)
+project(kuri_mbzirc_challenge_2_system_coordinator)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  roslib
   rospy
-  sensor_msgs
-  tf
-  pcl_ros
+  std_msgs
 )
-find_package(PCL 1.7 REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -70,7 +67,7 @@ find_package(PCL 1.7 REQUIRED)
 ## Generate added messages and services with any dependencies listed here
 # generate_messages(
 #   DEPENDENCIES
-#   sensor_msgs
+#   std_msgs
 # )
 
 ################################################
@@ -104,8 +101,8 @@ find_package(PCL 1.7 REQUIRED)
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
 #  INCLUDE_DIRS include
-#  LIBRARIES detect_goal
-#  CATKIN_DEPENDS roscpp roslib rospy sensor_msgs tf
+  LIBRARIES ch2_state_machine
+#  CATKIN_DEPENDS roscpp rospy std_msgs
 #  DEPENDS system_lib
 )
 
@@ -119,39 +116,26 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
-include_directories(${PCL_INCLUDE_DIRS})
-link_directories(${PCL_LIBRARY_DIRS})
 
-
-add_executable(detect_goal src/tf_listener.cpp)
-target_link_libraries(detect_goal ${catkin_LIBRARIES})
-
-
-
-
-add_executable(detect_goal_point src/tf_listener_class.cpp)
-target_link_libraries(detect_goal_point ${catkin_LIBRARIES})
-target_link_libraries(detect_goal_point ${catkin_LIBRARIES})
-target_link_libraries(detect_goal_point ${PCL_LIBRARIES})
 ## Declare a C++ library
-# add_library(detect_goal
-#   src/${PROJECT_NAME}/detect_goal.cpp
+# add_library(ch2_state_machine
+#   src/${PROJECT_NAME}/ch2_state_machine.cpp
 # )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(detect_goal ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(ch2_state_machine ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(detect_goal_node src/detect_goal_node.cpp)
+# add_executable(ch2_state_machine_node src/ch2_state_machine_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(detect_goal_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(ch2_state_machine_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(detect_goal_node
+# target_link_libraries(ch2_state_machine_node
 #   ${catkin_LIBRARIES}
 # )
 
@@ -170,7 +154,7 @@ target_link_libraries(detect_goal_point ${PCL_LIBRARIES})
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS detect_goal detect_goal_node
+# install(TARGETS ch2_state_machine ch2_state_machine_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -195,7 +179,7 @@ target_link_libraries(detect_goal_point ${PCL_LIBRARIES})
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_detect_goal.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_ch2_state_machine.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
