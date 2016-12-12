@@ -4,7 +4,7 @@
   <version>0.1.0</version>
   <description>MBZIRC Challenge 2 Wrench Detection</description>
 
-  <maintainer email=""></maintainer>
+  <maintainer email="tbd@todo.todo">TBD</maintainer>
   
   <license>BSD</license>
 
@@ -12,7 +12,6 @@
 
   <buildtool_depend>catkin</buildtool_depend>
 
-  <build_depend>roscpp</build_depend>
   <build_depend>actionlib</build_depend>
   <build_depend>actionlib_msgs</build_depend>
   <build_depend>kuri_mbzirc_sim</build_depend>
@@ -20,10 +19,6 @@
   <run_depend>kuri_mbzirc_sim</run_depend>
   <run_depend>actionlib</run_depend>
   <run_depend>actionlib_msgs</run_depend>
-  <run_depend>husky_gazebo</run_depend>
-  <run_depend>husky_ur5_moveit_config</run_depend>
-  <run_depend>moveit_commander</run_depend>
-  <run_depend>rviz</run_depend>
 
   <export>
   </export>
