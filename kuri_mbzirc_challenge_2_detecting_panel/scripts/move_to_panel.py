@@ -31,8 +31,6 @@ from tf.transformations import quaternion_from_euler, euler_from_quaternion
 
 # Variables
 lostMarker = False
-marker_position = []
-marker_angle = 0
 
 laser_min_range = 1   # Used to ignore the UR5 arm
 wall_distance = 2
@@ -52,6 +50,8 @@ class mbzirc_panel_track():
     ############
     ## Variables
     ############
+    self.desired_dist = 1.8
+
     self.ar_callback_start_time = rospy.Time()
     self.pose_callback_start_time = rospy.Time()
     self.foundMarker = False
@@ -95,34 +95,54 @@ class mbzirc_panel_track():
     #while (not self.gotOdom and not rospy.is_shutdown()):
     #  time.sleep(0.01)
 
-    # Case 1: No object detected, move around
-    # Case 2: Object detected, go in front of it
-      # Case 2.1: Oops, false alarm. Go back to moving
-      # Case 2.2: Done positioning. Terminate
-    # Case 3: Went 360, couldn't find it. Go back to exploration
+    ## Case 1: No object detected, move around
+    ## Case 2: Object detected, go in front of it
+    ##  Case 2.1: Oops, false alarm. Go back to moving
+    ##  Case 2.2: Done positioning. Terminate
+    ## Case 3: Went 360, couldn't find it. Go back to exploration
 
-    # 1: Move at slight angle perp to wall
+    ## 1: Move at slight angle perp to wall
 
 
 
-    # 2: Object detected
+    ## 2: Object detected
     while (not self.foundMarker and not rospy.is_shutdown()):
       time.sleep(0.1)
 
-    #self.starting_pose = current_pose
-    #self.starting_angle = 0
-    self.desired_dist = 1.5
 
     rospy.loginfo("Detected marker. Setting goal")
 
+    ## Sensor Coordinate frame: x = right, y = down, z = front
+    ## Nav Coordinate frame:    x = front, y = left, z = up
 
-    # Set waypoint
-    goal = self.generateRelativePositionGoal([1, 0, 0, 0])
+    x_goal =   self.marker_position.z - self.desired_dist*cos(self.marker_angle)
+    y_goal = -(self.marker_position.x - self.desired_dist*sin(self.marker_angle))
+    dist_goal = math.sqrt(x_goal*x_goal + y_goal*y_goal)
+
+    angle1 = atan2(y_goal, x_goal)
+    angle2 = -angle1 - self.marker_angle
+
+    print("x_d = " + str(round(x_goal,3)) + " y_d = " + str(round(y_goal,3)) + " a = " + str(round(degrees(self.marker_angle))) )
+
+
+    # Rotate to target
+    pose = [0, 0, 0, angle1]
+    goal = self.generateRelativePositionGoal(pose)
     self.waypoints.append( goal )
 
-    #self.waypoints.append(Pose(Point(-1, 0, 0.0), self.quaternions[0]))
 
-    # Cycle through the waypoints
+    # Drive to target
+    pose = [dist_goal, 0, 0, 0]
+    goal = self.generateRelativePositionGoal(pose)
+    self.waypoints.append( goal )
+
+    # Rotate to final position
+    if ( abs(angle2) > radians(10) ):
+      pose = [0, 0, 0, angle2]
+      goal = self.generateRelativePositionGoal(pose)
+      self.waypoints.append( goal )
+
+    # Execute movement to waypoints
     for i in range(0, len(self.waypoints) ):
       if rospy.is_shutdown():
         break;
@@ -132,46 +152,7 @@ class mbzirc_panel_track():
 
     rospy.signal_shutdown("Complete")
 
-    """
-    ## Sensor Coordinate frame: x = right, y = down, z = front
-    ## Nav Coordinate frame:    x = front, y = left, z = up
 
-    x_desired =   marker_position.z - desired_dist*cos(marker_angle)
-    y_desired = -(marker_position.x - desired_dist*sin(marker_angle))
-    dist_desired = math.sqrt(x_desired*x_desired + y_desired*y_desired)
-
-    angle1 = atan2(y_desired, x_desired)
-
-    print("x_d = " + str(round(x_desired,3)) + " y_d = " + str(round(y_desired,3)) + " a = " + str(round(degrees(marker_angle))) )
-    pose = [x_desired, y_desired, 0, angle1]
-
-    goal = generateRelativePositionGoalAdjusted(pose)
-
-
-
-
-    # Drive to target
-    pose = [x_desired, y_desired, 0, angle1]
-    goal = generateRelativePositionGoalAdjusted(pose)
-    rospy.loginfo("Moving Robot to the desired configuration in front of panel")
-    navigationActionServer.send_goal(goal)
-    rospy.loginfo("Waiting for Robot to reach the desired configuration in front of panel")
-    navigationActionServer.wait_for_result()
-
-    navResult  = navigationActionServer.get_result()
-    navState   = navigationActionServer.get_state()
-
-    # Rotate to final position
-    pose = [0, 0, 0, -pi/2]
-    goal = generateRelativePositionGoalAdjusted(pose)
-    rospy.loginfo("Moving Robot to the desired configuration in front of panel")
-    navigationActionServer.send_goal(goal)
-    rospy.loginfo("Waiting for Robot to reach the desired configuration in front of panel")
-    navigationActionServer.wait_for_result()
-
-    navResult  = navigationActionServer.get_result()
-    navState   = navigationActionServer.get_state()
-    """
 
   def shutdown(self):
     rospy.loginfo("Stopping the robot...")
