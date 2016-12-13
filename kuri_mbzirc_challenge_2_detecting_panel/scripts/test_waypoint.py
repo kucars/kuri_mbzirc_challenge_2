@@ -59,9 +59,9 @@ class mbzirc_c2_auto():
     # Set up the goal locations. Poses are defined in the map frame.
     self.waypoints=list()
     quaternions = list()
-    euler_angles = (0, 3*pi/2, pi, pi/2,0,3*pi/2)
 
-
+    # 0, clock, ?, anticlock
+    euler_angles = (0, -pi/2, pi, pi/2)
     for angle in euler_angles:
         q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
         q = Quaternion(*q_angle)
@@ -69,7 +69,7 @@ class mbzirc_c2_auto():
 
 
     # Define waypoints
-    self.waypoints.append(Pose(Point(0.5, 0.0, 0.0), quaternions[0]))
+    self.waypoints.append(Pose(Point(0.2, -0.2, 0.0), quaternions[0]))
 
     # Cycle through the waypoints
     for i in range(0, len(self.waypoints) ):
@@ -86,6 +86,8 @@ class mbzirc_c2_auto():
 
       # Start the robot moving toward the goal
       self.move(goal)
+
+    rospy.signal_shutdown("Complete")
 
 
   def move(self, goal):
@@ -109,9 +111,6 @@ class mbzirc_c2_auto():
   def shutdown(self):
     rospy.loginfo("Stopping the robot...")
     self.move_base.cancel_goal()
-    rospy.sleep(2)
-    self.cmd_vel_pub.publish(Twist())
-    rospy.sleep(1)
 
 
 if __name__ == '__main__':

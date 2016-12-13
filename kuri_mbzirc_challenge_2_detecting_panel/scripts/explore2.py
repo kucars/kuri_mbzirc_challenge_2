@@ -20,7 +20,7 @@ import numpy as np
 
 import actionlib
 
-from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion, PoseWithCovariance, Twist, Point
+from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion, PoseWithCovariance, Twist, Point, Pose
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import LaserScan
@@ -54,24 +54,27 @@ class mbzirc_panel_track():
     ############
     self.ar_callback_start_time = rospy.Time()
     self.pose_callback_start_time = rospy.Time()
+    self.foundMarker = False
 
     self.waypoints = list()
-    quaternions = list()
-    euler_angles = (0, 3*pi/2, pi, pi/2,0,3*pi/2)
+    self.quaternions = list()
+
+    euler_angles = (0, -pi/2, pi, pi/2)
     for angle in euler_angles:
         q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
         q = Quaternion(*q_angle)
-        quaternions.append(q)
+        self.quaternions.append(q)
 
 
     ############
     ## Set up subscribers, publishers and navigation stack
     ############
     self.current_pose = [0,0,0,0]
-    #self.scan_sub   = rospy.Subscriber('/scan', LaserScan, self.scan_callback, queue_size=5)
+    #self.gotOdom = False
+    ##self.scan_sub   = rospy.Subscriber('/scan', LaserScan, self.scan_callback, queue_size=5)
     self.marker_sub = rospy.Subscriber('/visualization_marker', Marker, self.arCallback, queue_size=5)
-    self.pose_sub   = rospy.Subscriber("/odometry/filtered", Odometry, self.poseCallback)
-    #self.marker_pub = rospy.Publisher ("/explore/HoughLines", Marker, queue_size = 100)
+    #self.pose_sub   = rospy.Subscriber("/odometry/filtered", Odometry, self.poseCallback)
+    ##self.marker_pub = rospy.Publisher ("/explore/HoughLines", Marker, queue_size = 100)
     self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=5)
 
     ## Subscribe to the move_base action server
@@ -82,22 +85,15 @@ class mbzirc_panel_track():
     self.move_base.wait_for_server(rospy.Duration(60))
     rospy.loginfo("Connected to move base server")
 
-
-    ## Goal state return values
-    goal_states = ['PENDING', 'ACTIVE', 'PREEMPTED',
-                   'SUCCEEDED', 'ABORTED', 'REJECTED',
-                   'PREEMPTING', 'RECALLING', 'RECALLED',
-                   'LOST']
-
     self.start()
 
 
 
 
   def start(self):
-    # Wait for initial odometry
-    while (not self.gotOdom and not rospy.is_shutdown()):
-      time.sleep(0.01)
+    ## Wait for initial odometry
+    #while (not self.gotOdom and not rospy.is_shutdown()):
+    #  time.sleep(0.01)
 
     # Case 1: No object detected, move around
     # Case 2: Object detected, go in front of it
@@ -113,36 +109,28 @@ class mbzirc_panel_track():
     while (not self.foundMarker and not rospy.is_shutdown()):
       time.sleep(0.1)
 
-    self.starting_pose = current_pose
-    self.starting_angle = 0
+    #self.starting_pose = current_pose
+    #self.starting_angle = 0
     self.desired_dist = 1.5
 
     rospy.loginfo("Detected marker. Setting goal")
 
 
     # Set waypoint
-    pose = [1, 0, 0, 0]
-    goal = generateRelativePositionGoalAdjusted(pose)
-
+    goal = self.generateRelativePositionGoal([1, 0, 0, 0])
     self.waypoints.append( goal )
 
+    #self.waypoints.append(Pose(Point(-1, 0, 0.0), self.quaternions[0]))
 
+    # Cycle through the waypoints
+    for i in range(0, len(self.waypoints) ):
+      if rospy.is_shutdown():
+        break;
 
+      # Start the robot moving toward the goal
+      self.move( self.waypoints[i] )
 
-    # Cycle through waypoints
-    while i < len(self.waypoints) and not rospy.is_shutdown():
-        # Intialize the waypoint goal
-        goal = MoveBaseGoal()
-
-        # Use the map frame to define goal poses
-        goal.target_pose.header.frame_id = 'base_link'
-        goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.pose = self.waypoints[i]
-
-        # Start the robot moving toward the goal
-        self.move(goal)
-
-        i += 1
+    rospy.signal_shutdown("Complete")
 
     """
     ## Sensor Coordinate frame: x = right, y = down, z = front
@@ -206,22 +194,27 @@ class mbzirc_panel_track():
       self.move_base.cancel_goal()
       rospy.loginfo("Timed out achieving goal")
     else:
-      # We made it!
+      ## We made it!
       state = self.move_base.get_state()
-      if state == GoalStatus.SUCCEEDED:
-        rospy.loginfo("Goal succeeded!")
+      #if state == GoalStatus.SUCCEEDED:
+      rospy.loginfo("Goal succeeded!")
 
 
-  def generateRelativePositionGoalAdjusted(self, pose):
-    x = self.current_pose[0] + pose[0]*cos(yaw) - pose[1]*sin(yaw)
-    y = self.current_pose[1] + pose[0]*sin(yaw) + pose[1]*cos(yaw)
-    z = self.current_pose[2] + pose[2]
+  def generateRelativePositionGoal(self, pose):
+    # Compute pose
+    x = pose[0]
+    y = pose[1]
+    z = pose[2]
+    yaw = pose[3]
+    quat = quaternion_from_euler(0.0, 0.0, yaw)
 
+    # Intialize the waypoint goal
+    goal = MoveBaseGoal()
 
-    angle = radians(self.current_pose[3] + pose[3])
-    quat = quaternion_from_euler(0.0, 0.0, angle)
-
-    goal = Pose( Point(x, y, z) , Quaternion(*quat.tolist()) )
+    # Use the map frame to define goal poses
+    goal.target_pose.header.frame_id = 'base_link'
+    goal.target_pose.header.stamp = rospy.Time.now()
+    goal.target_pose.pose = Pose( Point(x, y, z) , Quaternion(*quat.tolist()) )
     return goal
 
 
