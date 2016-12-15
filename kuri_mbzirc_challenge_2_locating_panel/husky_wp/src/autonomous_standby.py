@@ -30,12 +30,14 @@ from actionlib_msgs.msg import *
 from geometry_msgs.msg import Pose, PoseWithCovarianceStamped, Point, Quaternion, Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from tf.transformations import quaternion_from_euler
+from tf import TransformListener
+import tf
 from rospy.numpy_msg import numpy_msg
-from rospy_tutorials.msg import Floats
+import math
 import numpy as np
 from decimal import *
 import time
-from math import radians, pi
+
 class mbzirc_c2_auto():
     # A few key tasks are achieved in the initializer function:
     #     1. We load the pre-defined search routine
@@ -64,29 +66,37 @@ class mbzirc_c2_auto():
         # Pose coordinates are then displayed in the terminal
         # that was used to launch RViz.
         self.waypoints=list()
-        quaternions = list()
-        euler_angles = (0, 3*pi/2, pi, pi/2)
-        for angle in euler_angles:
-            q_angle = quaternion_from_euler(0, 0, angle, axes='sxyz')
-            q = Quaternion(*q_angle)
-            quaternions.append(q)
-        self.waypoints.append(Pose(Point(0, 0.0, 0.0), quaternions[0]))
-        self.waypoints.append(Pose(Point(8, 0, 0.0), quaternions[1]))
-        self.waypoints.append(Pose(Point(8.0, -2, 0.0), quaternions[2]))
-        self.waypoints.append(Pose(Point(0, -2, 0.0), quaternions[3]))
-        self.waypoints.append(Pose(Point(0, 0.0, 0.0), quaternions[0]))       
+         
+        
+        self.tf = TransformListener()
+        
 
 
 
 
 
 
+      #  self.locations = dict()
+      #  self.wpname = dict()
+        
+        rospack = rospkg.RosPack()
+        f = open(rospack.get_path('husky_wp')+'/params/pre-defined-standby.txt','r')
 
+                                                 
 
-
-
-
-
+      #  ct2 = 0
+        with f as openfileobject:
+            first_line = f.readline()
+            for line in openfileobject:
+                nome = [x.strip() for x in line.split(',')]
+                #self.wpname[ct2] = nome[0]
+                x = Decimal(nome[1]); y = Decimal(nome[2]); z = Decimal(nome[3])
+                X = Decimal(nome[4]); Y = Decimal(nome[5]); Z = Decimal(nome[6])
+                #self.locations[self.wpname[ct2]] = Pose(Point(x,y,z), Quaternion(X,Y,Z,1))
+                self.waypoints.append(Pose(Point(x,y,z), Quaternion(0,0,0,1)))
+                #print self.waypoints         
+                #time.sleep(1)
+                 
 
 
       #          ct2 = ct2+1
@@ -96,7 +106,7 @@ class mbzirc_c2_auto():
         print "Static path has : "
         print len(self.waypoints)
         print " point(s)."          
-
+        time.sleep(5)
 
         # Publisher to manually control the robot (e.g. to stop it, queue_size=5)
         self.cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=5)
@@ -119,7 +129,7 @@ class mbzirc_c2_auto():
         while i < len(self.waypoints) and not rospy.is_shutdown():
             # Update the marker display
             #self.marker_pub.publish(self.markers)
-            
+            time.sleep(2)
             # Intialize the waypoint goal
             goal = MoveBaseGoal()
             
@@ -135,10 +145,74 @@ class mbzirc_c2_auto():
             # Start the robot moving toward the goal
             self.move(goal)
             
-            i += 1
+            i += 1    
+            # check if the goal point is found by the detect_goal node       
+            if rospy.has_param('/panel_goal'):
+		# go to goal the goal goint  
+                  # get parameter 
+                panel_goal = rospy.get_param("/panel_goal")
+                print panel_goal[0];
+                print panel_goal[1];
+                print panel_goal[2];
 
 
+                while not rospy.is_shutdown():
+                	try:
+                                # Find the global coordinate of the UGV
+                		(trans,rot) = self.tf.lookupTransform('/odom', '/base_link', rospy.Time(0))
+                                # Calculate the vector between the UGV and the goal point  
+                		Tx=panel_goal[0]-trans[0];
+                        	Ty=panel_goal[1]-trans[1];
+                                print "Vehicle global coordinates is:"
+                                print trans[0]
+                                print trans[1]                                
+                                print "The travel vecor is:"
+                                print Tx
+                                print Ty
+                                # Calculate the travel distance between the UGV and the goal point  
+                                travel_distance=math.sqrt(math.pow(Tx,2)+math.pow(Ty,2))
+                                print "The travel distance is:"
+                                print travel_distance           
+                                # Calculate a scaling vector to make the UGV stop at 1.5m away from the goal.                                  
+                                travel_distance2=travel_distance-1.5;
+                                factor=travel_distance2/travel_distance           
+                                print "The scaliing factor is:"
+                                print factor
+                                Tx=Tx*factor
+                                Ty=Ty*factor
+                                # Calulate the goal point in the global frame
+                       		goal_x=trans[0]+Tx
+                        	goal_y=trans[1]+Ty
 
+                                # Intialize the waypoint goal
+           			goal = MoveBaseGoal()
+            
+            			# Use the map frame to define goal poses
+            			goal.target_pose.header.frame_id = 'odom'
+            
+            			# Set the time stamp to "now"
+            			goal.target_pose.header.stamp = rospy.Time.now()
+
+
+                                print "The goal is:"
+                                print goal_x
+                                print goal_y
+  
+                        	goal.target_pose.pose = Pose(Point(goal_x,goal_y,0), Quaternion(0,0,0,1))
+                        	self.move(goal)
+                		rospy.loginfo("Reach goal")
+                       		break  
+          
+        		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                        	rospy.loginfo("No transformation")
+                break
+            else:
+                rospy.loginfo("No goal found")
+
+                
+                
+                
+   
 
 
 

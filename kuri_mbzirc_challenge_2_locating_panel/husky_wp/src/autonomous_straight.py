@@ -80,7 +80,7 @@ class mbzirc_c2_auto():
       #  self.wpname = dict()
         
         rospack = rospkg.RosPack()
-        f = open(rospack.get_path('husky_wp')+'/params/pre-defined-path2.txt','r')
+        f = open(rospack.get_path('husky_wp')+'/params/pre-defined-straight.txt','r')
 
                                                  
 
@@ -160,10 +160,26 @@ class mbzirc_c2_auto():
                 		(trans,rot) = self.tf.lookupTransform('/odom', '/base_link', rospy.Time(0)) 
                 		Tx=panel_goal[0]-trans[0];
                         	Ty=panel_goal[1]-trans[1];                       
-                        	Tx=Tx*0.8
-                        	Ty=Ty*0.8
-                       		goal_x=trans[0]+Tx
-                        	goal_y=trans[1]+Ty
+
+                                print "Vehicle global coordinates is:"
+                                print trans[0]
+                                print trans[1]
+                                print "The travel vecor is:"
+                                print Tx
+                                print Ty
+                                travel_distance=math.sqrt(math.pow(Tx,2)+math.pow(Ty,2))
+                                print "The travel distance is:"
+                                print travel_distance
+                                travel_distance2=travel_distance-1.5;
+                                factor=travel_distance2/travel_distance
+                                print "The scaliing factor is:"
+                                print factor
+                                Tx=Tx*factor
+                                Ty=Ty*factor
+
+                                goal_x=trans[0]+Tx
+                                goal_y=trans[1]+Ty
+                        	
 
 
 

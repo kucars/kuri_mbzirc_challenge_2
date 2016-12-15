@@ -16,7 +16,6 @@
 #include "detection_velo/panel_searching.h"
 
 
-// Cluster the input pointcloud(raw input)
 void panel_searching::pointcloud_tree_clustering(pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud, pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered, std::vector<pcl::PointIndices>& cluster_indices)
 {
   std::cout << "PointCloud before filtering has: " << input_pointcloud->points.size () << " data points." << std::endl; //*
@@ -30,9 +29,12 @@ void panel_searching::pointcloud_tree_clustering(pcl::PointCloud<pcl::PointXYZ>:
   vg.filter (*cloud_filtered);
   std::cout << "PointCloud after filtering has: " << cloud_filtered->points.size ()  << " data points." << std::endl; //*
 
+  //cloud_filtered= input_pointcloud;
+
   // Creating the KdTree object for the search method of the extraction
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
   tree->setInputCloud (cloud_filtered);
+  //std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
   // If the cluster tolerance is too small the algorithm will fail to find anything or divid one object into multiple laysers
   // Since the Velodyne has a lower resolution between layers  
@@ -47,10 +49,13 @@ void panel_searching::pointcloud_tree_clustering(pcl::PointCloud<pcl::PointXYZ>:
 
 
 
-// Fit a plane model to each cluster
+
 void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud, int& plane_id,std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector)
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>), cloud_f (new      pcl::PointCloud<pcl::PointXYZ>);
+
+  // initiate indices vector
+  //vector<std::vector<pcl::PointIndices> plane_indices_vector;
   // Create the segmentation object for the planar model and set all the parameters
   pcl::SACSegmentation<pcl::PointXYZ> seg;
   pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
@@ -58,14 +63,24 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
   pcl::PCDWriter writer;
   seg.setOptimizeCoefficients (true);
-  // vertial plane fitting
+
+  // normal detection
+  //seg.setModelType (pcl::SACMODEL_PLANE);
+
+  // vertial plane detection
   seg.setModelType (pcl::SACMODEL_PARALLEL_PLANE); 
   seg.setAxis(Eigen::Vector3f(0,0,1));
   seg.setEpsAngle (0.4);
+
+
+
   seg.setMethodType (pcl::SAC_RANSAC);
   seg.setMaxIterations (100);
+
+  //change this to include objects on or attach on the plane 
   seg.setDistanceThreshold (0.02);
   int id=0;
+  //int i=0;
   int nr_points = (int) input_pointcloud->points.size ();
   std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> local_pc_vector;
   while (input_pointcloud->points.size () > 0.3 * nr_points)
@@ -78,6 +93,11 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
       std::cout << "Could not estimate a planar model for the given dataset." << std::endl;
       break;
     }
+
+
+    
+
+
     // Extract the planar inliers from the input cloud
     pcl::ExtractIndices<pcl::PointXYZ> extract;
     extract.setInputCloud (input_pointcloud);
@@ -86,7 +106,11 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
 
     // Get the points associated with the planar surface
     extract.filter (*cloud_plane);
-    std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size () << " data points." << std::endl; 
+    std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size () << " data points." << std::endl;
+   
+  //  std::stringstream ss;
+  //  ss << "plane_test/cloud_cluster_" << plane_id << ".pcd";
+  //  writer.write<pcl::PointXYZ> (ss.str (), *cloud_plane, false); //*    
     ++plane_id;
     // save the pc in the local pc vector
     local_pc_vector.push_back(cloud_plane); 
@@ -108,21 +132,32 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
 }
 
 
-//Find the bounding box for each planar point cloud in order to identify the: Dimension, centroid, and density.
+
 void panel_searching::bounding_box_detection(pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list)
 {
  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
  pcl::PCDWriter writer;
 
-
+ //save all the plane point cloud first for inspection
  int id=0;
+
+ 
+// initiate vectors for centroids, dimensions, and densities
+//  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector;
+
+
+//std::vector<Eigen::Vector4f> centroid_list;
+
 
 
 
 std::vector<double> density_list;
 Eigen::Vector3f one_dimension;
  for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator = pc_vector.begin(), end = pc_vector.end(); iterator != end; ++iterator) 
+ //for (std::vector<int>::const_iterator iterator= pc_vector.begin(); iterator= pc_vector.end (); ++iterator)  
   {
+    //std::cout << *iterator;
+    //int i=1;
      cloud_plane=*iterator; 
     ++id;
     //detect bounding box
@@ -165,8 +200,8 @@ Eigen::Vector3f one_dimension;
    }
 }
 
-//Decide if a planar pointcloud could be the goal of not with the following criteria:
-//1. Dimension in x and y. 2. Ratio of x and y
+
+
 void panel_searching::assembler(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector, pcl::PointCloud<pcl::PointXYZ>::Ptr plane_assemble,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list,std::vector<Eigen::Vector4f>& sifted_centroid_list)
 {
  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
@@ -189,6 +224,10 @@ for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator =
      //append centroid list to the sifted_centroid_list     
      
      sifted_centroid_list.push_back(one_centroid);
+
+     
+
+
      //append points from single plane to the output pointcloud
      for (size_t i = 0; i < cloud_plane->points.size(); ++i)
       {
@@ -205,15 +244,15 @@ for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator =
       }
       ++idx;
    }
+
+   std::cout<<"pass_count:"<<std::endl;
+   std::cout<<pass_count<<std::endl;
+
+
 } 
 
 
 
-
-
-
-// Main function. The whole workflow is:
-//1. Cluster the input raw pointcloud data. 2. Fit vertical plane to each cluster. 3. Find bounding box for each planar pointcloud. 4. Decide if a planar pointcloud could be the goal of not with pre-defined criteria
 void panel_searching::panel_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud, std::vector<pcl::PointIndices> cluster_indices, pcl::PointCloud<pcl::PointXYZ>::Ptr plane_assemble,std::vector<Eigen::Vector4f>& sifted_centroid_list)
 {
   pcl::PCDWriter writer;
@@ -236,14 +275,41 @@ void panel_searching::panel_extraction(pcl::PointCloud<pcl::PointXYZ>::Ptr input
     j++;
     // fit planer 
     plane_fitting(cloud_cluster, plane_id,pc_vector);    
-  } 
+  }
+  
   // find bounding box
   std::vector<Eigen::Vector3f> dimension_list;
   std::vector<Eigen::Vector4f> centroid_list;
-  bounding_box_detection(input_pointcloud, pc_vector, dimension_list, centroid_list); 
+
+  bounding_box_detection(input_pointcloud, pc_vector, dimension_list, centroid_list);
+   
   Eigen::Vector3f one_dimension;
   Eigen::Vector4f one_centroid;
+  std::cout<<"PC_vector size"<<std::endl;   
+  std::cout<<pc_vector.size()<<std::endl;
+  std::cout<<"dimension_list size"<<std::endl;   
+  //std::cout<<dimension_list.size()<<std::endl;
+  //std::cout<<dimension_list[0]<<std::endl;
+  //one_dimension=dimension_list[0];
+  //std::cout<<"outside:"<<std::endl;
+  //std::cout<<one_dimension[0,0]<<std::endl;
+  //std::cout<<one_dimension[0,1]<<std::endl;
+  //std::cout<<one_dimension[0,2]<<std::endl;
+  //std::cout<<one_dimension[0,0]<<std::endl;
+  //std::cout<<one_dimension[1,0]<<std::endl;
+  //std::cout<<one_dimension[2,0]<<std::endl;
+
+
+
   one_centroid=centroid_list[0];
+  //std::cout<<"one_centroid is:"<<std::endl;
+  //std::cout<<one_centroid<<std::endl;
+  //std::cout<<one_centroid[0,0]<<std::endl;
+  //std::cout<<one_centroid[1,0]<<std::endl;
+  //std::cout<<one_centroid[2,0]<<std::endl;
+  //std::cout<<one_centroid[3,0]<<std::endl;
+
+  //std::vector<Eigen::Vector4f> sifted_centroid_list;
   assembler(pc_vector, plane_assemble,dimension_list, centroid_list, sifted_centroid_list );
 }
 

@@ -33,7 +33,7 @@ from tf.transformations import quaternion_from_euler
 from tf import TransformListener
 import tf
 from rospy.numpy_msg import numpy_msg
-
+import math
 import numpy as np
 from decimal import *
 import time
@@ -80,7 +80,7 @@ class mbzirc_c2_auto():
       #  self.wpname = dict()
         
         rospack = rospkg.RosPack()
-        f = open(rospack.get_path('husky_wp')+'/params/pre-defined-path2.txt','r')
+        f = open(rospack.get_path('husky_wp')+'/params/pre-defined-standby.txt','r')
 
                                                  
 
@@ -145,7 +145,8 @@ class mbzirc_c2_auto():
             # Start the robot moving toward the goal
             self.move(goal)
             
-            i += 1            
+            i += 1    
+            # check if the goal point is found by the detect_goal node       
             if rospy.has_param('/panel_goal'):
 		# go to goal the goal goint  
                   # get parameter 
@@ -157,16 +158,31 @@ class mbzirc_c2_auto():
 
                 while not rospy.is_shutdown():
                 	try:
-                		(trans,rot) = self.tf.lookupTransform('/odom', '/base_link', rospy.Time(0)) 
+                                # Find the global coordinate of the UGV
+                		(trans,rot) = self.tf.lookupTransform('/odom', '/base_link', rospy.Time(0))
+                                # Calculate the vector between the UGV and the goal point  
                 		Tx=panel_goal[0]-trans[0];
-                        	Ty=panel_goal[1]-trans[1];                       
-                        	Tx=Tx*0.8
-                        	Ty=Ty*0.8
+                        	Ty=panel_goal[1]-trans[1];
+                                print "Vehicle global coordinates is:"
+                                print trans[0]
+                                print trans[1]                                
+                                print "The travel vecor is:"
+                                print Tx
+                                print Ty
+                                # Calculate the travel distance between the UGV and the goal point  
+                                travel_distance=math.sqrt(math.pow(Tx,2)+math.pow(Ty,2))
+                                print "The travel distance is:"
+                                print travel_distance           
+                                # Calculate a scaling vector to make the UGV stop at 1.5m away from the goal.                                  
+                                travel_distance2=travel_distance-1.5;
+                                factor=travel_distance2/travel_distance           
+                                print "The scaliing factor is:"
+                                print factor
+                                Tx=Tx*factor
+                                Ty=Ty*factor
+                                # Calulate the goal point in the global frame
                        		goal_x=trans[0]+Tx
                         	goal_y=trans[1]+Ty
-
-
-
 
                                 # Intialize the waypoint goal
            			goal = MoveBaseGoal()

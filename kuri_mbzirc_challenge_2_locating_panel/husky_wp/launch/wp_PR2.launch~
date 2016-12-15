@@ -25,14 +25,19 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 -->
 <launch>
 
-  <!--Run a static transform between /odom and /map /-->
-  <node pkg="tf" type="static_transform_publisher" name="base_velodyne_broadcaster" args="-0.33 0 0.9 0 0 0 /base_link /velodyne 100" />
+  <!--- Run gmapping -->
+  <!--- include file="$(find husky_navigation)/launch/gmapping.launch" /-->
+
+  <!--- Run Move Base -->
+  <include file="$(find husky_navigation)/launch/move_base.launch" />
+
   
-  <!--- velodyne_detection node -->
-  <node name="velodyne_detection" pkg="detection_velo" type="detection" />
+  <!-- Run a static transform between /odom and /map -->
+  <node pkg="tf" type="static_transform_publisher" name="base_map_broadcaster" args="0 0 0 0 0 0 /map /odom 100" />
 
+  <!-- Run the map server with a blank map -->
+  <node name="map_server" pkg="map_server" type="map_server" args="$(find husky_wp)/maps/bm.yaml"/>
 
-  <!--- panel_goalpoint node -->
-  <node name="panel_goalpoint" pkg="detect_goal" type="detect_goal_point" />
+  <node name="autonomous" pkg="husky_wp" type="autonomous_square.py" />
 
 </launch>

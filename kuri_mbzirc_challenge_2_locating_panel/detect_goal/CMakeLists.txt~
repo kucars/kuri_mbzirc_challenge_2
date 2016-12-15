@@ -123,6 +123,11 @@ include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 
 
+add_executable(detect_goal src/tf_listener.cpp)
+target_link_libraries(detect_goal ${catkin_LIBRARIES})
+
+
+
 
 add_executable(detect_goal_point src/tf_listener_class.cpp)
 target_link_libraries(detect_goal_point ${catkin_LIBRARIES})

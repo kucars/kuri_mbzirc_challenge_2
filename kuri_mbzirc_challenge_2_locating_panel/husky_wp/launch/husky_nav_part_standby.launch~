@@ -26,25 +26,14 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 <launch>
 
   <!--- Run gmapping -->
-  <include file="$(find husky_navigation)/launch/gmapping.launch" />
+  <!--include file="$(find husky_navigation)/launch/gmapping.launch" /-->
 
   <!--- Run Move Base -->
-  <include file="$(find husky_navigation)/launch/move_base.launch" />
+  <include file="$(find husky_navigation)/launch/move_base_mapless_demo.launch" />
 
   <!--- husky_waypoint_navigation node -->
-  <node name="husky_waypoint_navigation" pkg="husky_wp" type="autonomous_mod.py" />
+  <node name="husky_waypoint_navigation" pkg="husky_wp" type="autonomous_standby.py" />
 
 
-
-
-  <!--Run a static transform between /odom and /map /-->
-  <node pkg="tf" type="static_transform_publisher" name="base_velodyne_broadcaster" args="-0.33 0 0.9 0 0 0 /base_link /velodyne 100" />
-  
-  <!--- velodyne_detection node -->
-  <node name="velodyne_detection" pkg="detection_velo" type="detection" />
-
-
-  <!--- panel_goalpoint node -->
-  <node name="panel_goalpoint" pkg="detect_goal" type="detect_goal_point" />
 
 </launch>

@@ -4,6 +4,7 @@
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
+//#include <velodyne_pointcloud/point_types.h>
 #include "detection_velo/point_types.h"
 #include <tf/transform_listener.h>
 
@@ -25,7 +26,9 @@ class detection
     void convertPoints(const VPointCloud::ConstPtr &inMsg);
     Subscriber input;
     Publisher output;
-    Publisher center; 
+    Publisher center;
+    // New private member
+    //tf::TransformListener tf_listener;   
 };
 
 #endif
