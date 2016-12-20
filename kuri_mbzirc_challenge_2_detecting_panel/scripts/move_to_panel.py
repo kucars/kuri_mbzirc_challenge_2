@@ -50,7 +50,7 @@ class mbzirc_panel_track():
     ############
     ## Variables
     ############
-    self.desired_dist = 1.8
+    self.desired_dist = 2.2
 
     self.ar_callback_start_time = rospy.Time()
     self.pose_callback_start_time = rospy.Time()
@@ -88,6 +88,12 @@ class mbzirc_panel_track():
     self.start()
 
 
+  def shutdown(self):
+    rospy.loginfo("Stopping the robot...")
+    self.move_base.cancel_goal()
+    rospy.sleep(2)
+    self.cmd_vel_pub.publish(Twist())
+    rospy.sleep(1)
 
 
   def start(self):
@@ -112,54 +118,65 @@ class mbzirc_panel_track():
 
     rospy.loginfo("Detected marker. Setting goal")
 
-    ## Sensor Coordinate frame: x = right, y = down, z = front
-    ## Nav Coordinate frame:    x = front, y = left, z = up
 
-    x_goal =   self.marker_position.z - self.desired_dist*cos(self.marker_angle)
-    y_goal = -(self.marker_position.x - self.desired_dist*sin(self.marker_angle))
-    dist_goal = math.sqrt(x_goal*x_goal + y_goal*y_goal)
+    # Distances greater than dist_step_threshold result in us incrementally moving the robnot by 1m distances to account for odom drift
+    dist_step_threshold = self.desired_dist + 1
+    dist_goal = 1000000
 
-    angle1 = atan2(y_goal, x_goal)
-    angle2 = -angle1 - self.marker_angle
+    while ( dist_goal > dist_step_threshold and not rospy.is_shutdown() ):
+      if (self.foundMarker):
+        ## Sensor Coordinate frame: x = right, y = down, z = front
+        ## Nav Coordinate frame:    x = front, y = left, z = up
 
-    print("x_d = " + str(round(x_goal,3)) + " y_d = " + str(round(y_goal,3)) + " a = " + str(round(degrees(self.marker_angle))) )
+        x_goal =   self.marker_position.z - self.desired_dist*cos(self.marker_angle)
+        y_goal = -(self.marker_position.x - self.desired_dist*sin(self.marker_angle))
+        dist_goal = math.sqrt(x_goal*x_goal + y_goal*y_goal)
+
+        angle1 = atan2(y_goal, x_goal)
+        angle2 = -angle1 - self.marker_angle
+
+        print("x_d = " + str(round(x_goal,3)) + " y_d = " + str(round(y_goal,3)) + " a = " + str(round(degrees(self.marker_angle))) )
 
 
-    # Rotate to target
-    pose = [0, 0, 0, angle1]
-    goal = self.generateRelativePositionGoal(pose)
-    self.waypoints.append( goal )
+      # Rotate to target
+        pose = [0, 0, 0, angle1]
+        goal = self.generateRelativePositionGoal(pose)
+        self.move( goal )
+
+        if rospy.is_shutdown():
+           return;
+
+      # Drive to target
+      m = dist_goal
+      if (dist_goal > dist_step_threshold):
+        m = 1
+
+      pose = [m, 0, 0, 0]
+      goal = self.generateRelativePositionGoal(pose)
+      self.move( goal )
+
+      #Wait a second to find marker
+      self.foundMarker = False
+
+      for i in range(0,10):
+        if (not self.foundMarker and not rospy.is_shutdown()):
+          time.sleep(0.1)
+
+      if (not self.foundMarker):
+        dist_goal -= 1
 
 
-    # Drive to target
-    pose = [dist_goal, 0, 0, 0]
-    goal = self.generateRelativePositionGoal(pose)
-    self.waypoints.append( goal )
+
+    if rospy.is_shutdown():
+       return;
 
     # Rotate to final position
     if ( abs(angle2) > radians(10) ):
       pose = [0, 0, 0, angle2]
       goal = self.generateRelativePositionGoal(pose)
-      self.waypoints.append( goal )
-
-    # Execute movement to waypoints
-    for i in range(0, len(self.waypoints) ):
-      if rospy.is_shutdown():
-        break;
-
-      # Start the robot moving toward the goal
-      self.move( self.waypoints[i] )
+      self.move( goal )
 
     rospy.signal_shutdown("Complete")
-
-
-
-  def shutdown(self):
-    rospy.loginfo("Stopping the robot...")
-    self.move_base.cancel_goal()
-    rospy.sleep(2)
-    self.cmd_vel_pub.publish(Twist())
-    rospy.sleep(1)
 
 
 
@@ -168,7 +185,7 @@ class mbzirc_panel_track():
     self.move_base.send_goal(goal)
 
     # Allow 1 minute to get there
-    finished_within_time = self.move_base.wait_for_result(rospy.Duration(600))
+    finished_within_time = self.move_base.wait_for_result(rospy.Duration(60))
 
     # If we don't get there in time, abort the goal
     if not finished_within_time:
@@ -212,8 +229,9 @@ class mbzirc_panel_track():
     # Show message once a second
     if (rospy.Time.now() - self.ar_callback_start_time > rospy.Duration(1)):
       self.ar_callback_start_time = rospy.Time.now()
-      print (degrees(self.marker_angle))
       print (self.marker_position)
+      print ("yaw: " + str(degrees(self.marker_angle)) )
+
       print("")
 
 
@@ -232,166 +250,6 @@ class mbzirc_panel_track():
     if (rospy.Time.now() - self.pose_callback_start_time > rospy.Duration(1)):
       self.pose_callback_start_time = rospy.Time.now()
       rospy.loginfo("Current Location x: " + str(round(x,3)) + "\ty: " + str(round(y,3)) + "\tz: " + str(round(z,3)) + "\tyaw: " + str(round(degrees(yaw), 1)))
-
-
-
-
-
-
-
-
-
-# Generate range using floats
-def frange(start, end, jump):
-  out = [start]
-  while True:
-    start += jump
-    out.append(start)
-    
-    if (start > end):
-      break;
-    
-  return out
-    
-def NormalizeAngle(a):
-  # Get angle between (-pi, pi]
-  if (a > pi):
-    a -= 2*pi
-  if (a <= -pi):
-    a += 2*pi
-    
-  return a
-    
-class HoughLine:
-  def __init__(self, r, angle, votes):
-    self.r = r
-    self.angle = angle
-    self.votes = votes
-  def __repr__(self):
-    return repr((self.r, self.angle, self.votes))
-
-# Hough transform designed for radial laser data
-def houghTransform(r, alpha):
-  global laser_min_range, hough_angle_res, hough_range_res, hough_threshold
-  
-  theta = frange(0, 2*math.pi, hough_angle_res)
-  rho   = frange(0, max(r), hough_range_res)
-  
-  # Create 2D grid of theta and rho
-  votes = [[0 for i in range(len(rho))] for j in range(len(theta))]
-  
-  # Analyze each point
-  for p in range(len(r)):
-    if (r[p] < laser_min_range):
-      continue;
-    
-    for i_t in range(len(theta)):
-      r_temp = r[p]*cos(alpha[p] - theta[i_t])
-      if (r_temp < 0):
-	continue
-      
-      r_temp = hough_range_res*round(r_temp/hough_range_res) # round to nearest value of rho
-      i_r = int(r_temp/hough_range_res) # find index of corresponding rho
-      
-      votes[i_t][i_r] += 1
-	
-  # Extract lines by thresholding
-  line_out = [] #Output lines
-  for i_r in range(len(rho)):
-    for i_t in range(len(theta)):
-      if (votes[i_t][i_r] >= hough_threshold): # and votes[i_t][i_r] >= v_max*0.5
-	h = HoughLine(rho[i_r], theta[i_t], votes[i_t][i_r])
-	line_out.append(h)
-  
-  if (len(line_out) == 0):
-    return
-  
-  # Sort them in descending order
-  line_out = sorted(line_out, key=lambda l: l.votes, reverse=True)
-  
-  # Record the top angle for each +- 45 degree increment
-  line_temp = []
-  line_temp.append(line_out[0])
-  for i in range(len(line_out)):
-    if (line_out[i].r >= 20):
-      continue
-    
-    # Record it if there are no similar recorded angles
-    isValid = True
-    for j in range (len(line_temp)):
-      if ( abs(NormalizeAngle(line_out[i].angle - line_temp[j].angle) <= pi/4) ):
-	isValid = False
-	break
-    if (isValid):
-      line_temp.append(line_out[i])
-      
-  line_out = line_temp
-  
-  # Create markers for each
-  marker = Marker()
-  marker.header.frame_id = "/base_link"
-
-  marker.type = marker.LINE_LIST
-  marker.pose.orientation.w = 1
-
-  marker.scale.x = 0.01
-  marker.color.a = 1.0
-  marker.color.b = 1.0
-    
-  # Print y = mx+c versions of each line and make a marker for each
-  line_offset = -0.55
-  for i in range(len(line_out)):
-    m = tan(line_out[i].angle)
-    c = line_out[i].r / cos(line_out[i].angle)
-    q = 30
-    y1, x1 = [-q, -m*q - c + line_offset]
-    y2, x2 = [ q,  m*q - c + line_offset]
-    
-    #print ("votes = " + str(line_out[i].votes) + "\tr = " + str(line_out[i].r) + "\tangle = " + str(round(line_out[i].angle/pi*180))+ "\ty = " + str(round(m,3)) + "x + " + str(round(c,3)) )
-    
-    p1 = Point() 
-    p1.x = -x1
-    p1.y = y1
-    p1.z = 0
-    marker.points.append(p1)
-    
-    p2 = Point() 
-    p2.x = -x2
-    p2.y = y2
-    p2.z = 0
-    marker.points.append(p2)
-
-  # Publish markers
-  marker_pub.publish(marker)
-
-
-
-
-
-
-# Laser scanner callback
-def scan_callback(msg):
-  global laser_min_range, closest_obstacle
-  
-  ranges = []
-  angles = []
-  
-  closest_obstacle = 100
-  for i in range(len(msg.ranges)):
-    # Skip points at infinity or too close
-    if ( math.isinf(msg.ranges[i]) or msg.ranges[i] < laser_min_range ):
-      continue
-    
-    # Record range and compute angle
-    ranges.append(msg.ranges[i])
-    angles.append(msg.angle_max - 2 * i * msg.angle_max / len(msg.ranges))
-    
-    # Find closest obstacle
-    if (msg.ranges[i] < closest_obstacle):
-      closest_obstacle = msg.ranges[i]
-  
-  # Extract lines with hough transform
-  houghTransform(ranges, angles)
 
 
 if __name__=='__main__':

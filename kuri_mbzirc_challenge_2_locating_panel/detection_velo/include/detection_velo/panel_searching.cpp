@@ -35,7 +35,7 @@ void panel_searching::pointcloud_tree_clustering(pcl::PointCloud<pcl::PointXYZ>:
   tree->setInputCloud (cloud_filtered);
   pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
   // If the cluster tolerance is too small the algorithm will fail to find anything or divid one object into multiple laysers
-  // Since the Velodyne has a lower resolution between layers  
+  // Since the Velodyne has a lower resolution between layers
   ec.setClusterTolerance (0.2); // 20cm
   ec.setMinClusterSize (100);
   ec.setMaxClusterSize (25000);
@@ -89,7 +89,7 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
     std::cout << "PointCloud representing the planar component: " << cloud_plane->points.size () << " data points." << std::endl; 
     ++plane_id;
     // save the pc in the local pc vector
-    local_pc_vector.push_back(cloud_plane); 
+    local_pc_vector.push_back(cloud_plane);
     // Remove the planar inliers, extract the rest
     extract.setNegative (true);
     extract.filter (*cloud_f);
@@ -98,7 +98,7 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
 
 
   if (local_pc_vector.size()<3)
-  {  
+  {
     std::cout << "plane size"<<std::endl;
     std::cout << local_pc_vector.size()<<std::endl;
     std::cout << "plane appended"<<std::endl;
@@ -111,13 +111,15 @@ void panel_searching::plane_fitting(pcl::PointCloud<pcl::PointXYZ>::Ptr input_po
 //Find the bounding box for each planar point cloud in order to identify the: Dimension, centroid, and density.
 void panel_searching::bounding_box_detection(pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list)
 {
- pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
- pcl::PCDWriter writer;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
+  pcl::PCDWriter writer;
 
 
  int id=0;
 
 
+  // initiate vectors for centroids, dimensions, and densities
+  //  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector;
 
 std::vector<double> density_list;
 Eigen::Vector3f one_dimension;
@@ -126,7 +128,7 @@ Eigen::Vector3f one_dimension;
      cloud_plane=*iterator; 
     ++id;
     //detect bounding box
-    std::cout<<"Start finding bounding box"<<std::endl;   
+    std::cout<<"Start finding bounding box"<<std::endl;
     // find bounding box
     // Compute principal directions
     Eigen::Vector4f pcaCentroid;
@@ -152,30 +154,30 @@ Eigen::Vector3f one_dimension;
 
     // Final transform
     const Eigen::Quaternionf bboxQuaternion(eigenVectorsPCA); //Quaternions are a way to do rotations https://www.youtube.com/  watch?v=mHVwd8gYLnI
-    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();    
-    // save the centroid into the centroid vector 
+    const Eigen::Vector3f bboxTransform = eigenVectorsPCA * meanDiagonal + pcaCentroid.head<3>();
+    // save the centroid into the centroid vector
     centroid_list.push_back(pcaCentroid);
     // save dimenstion into dimension list
     one_dimension(0,0)=maxPoint.x - minPoint.x;
-    one_dimension(1,0)=maxPoint.y - minPoint.y;      
+    one_dimension(1,0)=maxPoint.y - minPoint.y;
     one_dimension(2,0)=maxPoint.z - minPoint.z;
     dimension_list.push_back(one_dimension);
     // save density into density list
     density_list.push_back(cloud_plane->points.size()/(one_dimension(0,0)*one_dimension(1,0)*one_dimension(2,0)));
-   }
+  }
 }
 
 //Decide if a planar pointcloud could be the goal of not with the following criteria:
 //1. Dimension in x and y. 2. Ratio of x and y
 void panel_searching::assembler(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector, pcl::PointCloud<pcl::PointXYZ>::Ptr plane_assemble,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list,std::vector<Eigen::Vector4f>& sifted_centroid_list)
 {
- pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
- Eigen::Vector3f one_dimension;
- Eigen::Vector4f one_centroid;
- int idx=0;
- int pass_count=0;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
+  Eigen::Vector3f one_dimension;
+  Eigen::Vector4f one_centroid;
+  int idx=0;
+  int pass_count=0;
 
-for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator = pc_vector.begin(), end = pc_vector.end(); iterator != end; ++iterator) 
+  for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator = pc_vector.begin(), end = pc_vector.end(); iterator != end; ++iterator)
   {
      cloud_plane=*iterator;
      //filtered with plane dimension
@@ -192,16 +194,14 @@ for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator =
      //append points from single plane to the output pointcloud
      for (size_t i = 0; i < cloud_plane->points.size(); ++i)
       {
-       //create single point
+        //create single point
         pcl::PointXYZ p;
         p.x = cloud_plane->points[i].x;
         p.y = cloud_plane->points[i].y;
         p.z = cloud_plane->points[i].z;
-       //assign pointer value
+        //assign pointer value
         plane_assemble->points.push_back(p);
-        ++plane_assemble->width;        
-      } 
-      ++pass_count;
+        ++plane_assemble->width;
       }
       ++idx;
    }
