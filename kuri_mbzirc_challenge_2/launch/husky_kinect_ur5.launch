@@ -20,7 +20,6 @@
   <arg name="laser_enabled" default="true"/>
   <arg name="ur5_enabled" default="true"/>
   <arg name="kinect_enabled" default="true"/>
-  <arg name="kinect2_enabled" default="true"/>
   <arg name="gripper_enabled" default="false"/>
   
 
@@ -33,7 +32,6 @@
     <arg name="laser_enabled" value="$(arg laser_enabled)"/>
     <arg name="ur5_enabled" value="$(arg ur5_enabled)"/>
     <arg name="kinect_enabled" value="$(arg kinect_enabled)"/>
-    <arg name="kinect2_enabled" value="$(arg kinect2_enabled)"/>
     <arg name="gripper_enabled" value="$(arg gripper_enabled)"/>
     <arg name="robot_initial_pose" value="$(arg robot_initial_pose)"/>    
   </include>
