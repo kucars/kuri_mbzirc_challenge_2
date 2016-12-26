@@ -179,20 +179,21 @@ void panel_searching::assembler(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>
 
   for (std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>::const_iterator iterator = pc_vector.begin(), end = pc_vector.end(); iterator != end; ++iterator)
   {
-     cloud_plane=*iterator;
-     //filtered with plane dimension
-     one_dimension=dimension_list[idx];
-     one_centroid=centroid_list[idx];
-     std::cout<<one_dimension<<std::endl;
-     std::cout<<"inside"<<std::endl;
-     std::cout<<one_dimension[0,1]<<std::endl;
-     std::cout<<one_dimension[0,2]<<std::endl;
-     if( one_dimension[0,1]<1.5  && one_dimension[0,2]<1.5 && one_dimension[0,2]/one_dimension[0,1]<2&&one_dimension[0,1]>0.5) {
-     //append centroid list to the sifted_centroid_list     
-     
-     sifted_centroid_list.push_back(one_centroid);
-     //append points from single plane to the output pointcloud
-     for (size_t i = 0; i < cloud_plane->points.size(); ++i)
+    cloud_plane=*iterator;
+    //filtered with plane dimension
+    one_dimension=dimension_list[idx];
+    one_centroid=centroid_list[idx];
+    std::cout<<one_dimension<<std::endl;
+    std::cout<<"inside"<<std::endl;
+    std::cout<<one_dimension[0,1]<<std::endl;
+    std::cout<<one_dimension[0,2]<<std::endl;
+    if( one_dimension[0,1]<1.5  && one_dimension[0,2]<1.5 && one_dimension[0,2]/one_dimension[0,1]<2&&one_dimension[0,1]>0.5)
+    {
+      //append centroid list to the sifted_centroid_list
+
+      sifted_centroid_list.push_back(one_centroid);
+      //append points from single plane to the output pointcloud
+      for (size_t i = 0; i < cloud_plane->points.size(); ++i)
       {
         //create single point
         pcl::PointXYZ p;
@@ -204,8 +205,9 @@ void panel_searching::assembler(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>
         ++plane_assemble->width;
       }
       ++idx;
-   }
-} 
+    }
+  }
+}
 
 
 

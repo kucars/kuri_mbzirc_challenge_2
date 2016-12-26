@@ -4,11 +4,6 @@ project(kuri_mbzirc_challenge_2_wrench_detection)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS roscpp actionlib_msgs)
 
-generate_messages(
-    DEPENDENCIES
-    actionlib_msgs
-    std_msgs
-)
 ###################################
 ## catkin specific configuration ##
 ###################################
