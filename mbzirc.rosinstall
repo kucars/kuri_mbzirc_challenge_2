@@ -13,13 +13,11 @@
     local-name: kuri_mbzirc_sim
     uri: https://github.com/kuri-kustar/kuri_mbzirc_sim.git
     version: ae3cce0
-# https://github.com/husky/husky_simulator/pull/24
-# https://github.com/husky/husky_simulator/pull/25
-# https://github.com/husky/husky_simulator/pull/26
+
 - git:
     local-name: husky_simulator
-    uri: https://github.com/k-okada/husky_simulator.git
-    version: f8a670d1578254ef6d5c7627ea6f7ac6b8d99a15
+    uri: https://github.com/husky/husky_simulator.git
+    version: 4d5f46e5fecca532240ed3df823e035b83fa09ca
 
 - git:
     local-name: velodyne_simulator
