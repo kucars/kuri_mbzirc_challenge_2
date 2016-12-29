@@ -7,6 +7,7 @@ find_package(catkin REQUIRED COMPONENTS
   #geometry_msgs
   #nav_msgs
   pcl_ros
+  pcl_conversions
   roscpp
   #sensor_msgs
   #shape_msgs
@@ -17,11 +18,12 @@ find_package(catkin REQUIRED COMPONENTS
   velodyne_driver
   velodyne_pointcloud
   velodyne_msgs
+  laser_geometry
   )
 
 #find_package(Boost REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
-             ${${PROJECT_NAME}_CATKIN_DEPS} pcl_conversions)
+             ${${PROJECT_NAME}_CATKIN_DEPS})
 
 #find_package(PCL REQUIRED)
 find_package(PCL 1.7 REQUIRED)
@@ -41,3 +43,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 add_executable(determine_wall src/determine_wall.cpp)
 target_link_libraries(determine_wall ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(determine_wall ${catkin_EXPORTED_TARGETS})
+
+add_executable(detect_panel src/detect_panel.cpp)
+target_link_libraries(detect_panel ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(detect_panel ${catkin_EXPORTED_TARGETS})
