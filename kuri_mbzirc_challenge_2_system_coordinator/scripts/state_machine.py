@@ -147,10 +147,11 @@ class detect_panel(smach.State):
 
 class move_panel_waypoints(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['not_found'])
+        smach.State.__init__(self, outcomes=['not_found'], input_keys=['waypoints'])
 
 
     def execute(self, userdata):
+        print("Found " + str(len(userdata.waypoints.poses)) + " waypoints on frame " + userdata.waypoints.header.frame_id)
         time.sleep(1)
         return 'not_found'
 
@@ -306,26 +307,24 @@ class Challenge2():
                               #outcome_cb=self.concurrence_outcome_cb
                               )
 
-        def result_cb(user_data, status, result):
-            if (result.success):
-                return 'succeeded'
-            else:
-                return 'aborted'
-
-
         self.circumnavigating=smach.StateMachine(outcomes=['terminated', 'failed', 'preempted'])
         with self.circumnavigating:
 
             smach.StateMachine.add('GET_PANEL_CLUSTER',
                             smach_ros.SimpleActionState('get_panel_cluster', PanelPositionAction,
-                                result_cb = result_cb), #get_panel_cluster(),
-                            transitions={'aborted':'MOVE_CLUSTER_SEARCH','succeeded':'MOVE_PANEL_WAYPOINTS'})
+                                result_cb = self.get_panel_cluster_result_cb,
+                                output_keys = ['waypoints']),
+                            transitions={'aborted':'MOVE_CLUSTER_SEARCH','succeeded':'MOVE_PANEL_WAYPOINTS'},
+                            remapping={'waypoints':'cluster_waypoints'}
+                            )
 
             smach.StateMachine.add('MOVE_CLUSTER_SEARCH', move_cluster_search(),
                             transitions={'succeeded':'GET_PANEL_CLUSTER'})
 
             smach.StateMachine.add('MOVE_PANEL_WAYPOINTS', move_panel_waypoints(),
-                            transitions={'not_found':'failed'})
+                            transitions={'not_found':'failed'},
+                            remapping={'waypoints':'cluster_waypoints'}
+                            )
 
 
         self.detect_panel=smach.StateMachine(outcomes=['terminated', 'preempted'])
@@ -430,6 +429,16 @@ class Challenge2():
             return True
         else:
             return False
+
+
+    ## GET_PANEL_CLUSTER
+    def get_panel_cluster_result_cb(self, userdata, status, result):
+        if (result.success):
+            userdata.waypoints = result.waypoints;
+            print("Number of waypoints: " + str(len(result.waypoints.poses)) )
+            return 'succeeded'
+        else:
+            return 'aborted'
 
 
 

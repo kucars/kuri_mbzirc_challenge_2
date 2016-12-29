@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 2.8.3)
 project(kuri_mbzirc_challenge_2_msgs)
 
 ## Find catkin macros and libraries
-find_package(catkin REQUIRED COMPONENTS roscpp actionlib_msgs)
+find_package(catkin REQUIRED COMPONENTS
+    roscpp
+    actionlib_msgs
+    geometry_msgs
+  )
 
 add_action_files(
     DIRECTORY action
@@ -13,6 +17,7 @@ add_action_files(
 
 generate_messages(
     DEPENDENCIES
+    geometry_msgs
     actionlib_msgs
     std_msgs
 )

@@ -1,12 +1,14 @@
 #include "ros/ros.h"
 #include <iostream>
 
-#include "geometry_msgs/Point.h"
+#include "geometry_msgs/Pose.h"
+#include "geometry_msgs/PoseArray.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/LaserScan.h"
 #include "visualization_msgs/Marker.h"
 
 #include <tf/transform_listener.h>
+#include <tf_conversions/tf_eigen.h>
 #include "velodyne_pointcloud/point_types.h"
 
 #include <laser_geometry/laser_geometry.h>
@@ -36,6 +38,7 @@ ros::Subscriber sub_scan;
 ros::Publisher  pub_wall;
 ros::Publisher  pub_lines;
 ros::Publisher  pub_points;
+ros::Publisher  pub_poses;
 tf::TransformListener *tf_listener;
 
 bool isNodeEnabled = false;
@@ -128,10 +131,11 @@ public:
     }
   }
 
-  void setSuccess()
+  void setSuccess(geometry_msgs::PoseArray waypoints)
   {
     isNodeEnabled = false;
     result_.success = true;
+    result_.waypoints = waypoints;
   }
 
   void setFailure()
@@ -166,18 +170,95 @@ int main(int argc, char **argv)
   pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
   pub_lines = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
   pub_points= node.advertise<visualization_msgs::Marker>("/explore/points", 10);
+  pub_poses = node.advertise<geometry_msgs::PoseArray>("/explore/poses", 10);
 
   tf_listener = new tf::TransformListener();
-  tf_listener->setExtrapolationLimit(ros::Duration(0.1));
+  //isNodeEnabled = true; //For node test
 
   ros::spin();
   return 0;
 }
 
+geometry_msgs::Quaternion getQuaternionFromYaw(double yaw)
+{
+  geometry_msgs::Quaternion quat;
+
+  tf::Quaternion tf_q;
+  tf_q = tf::createQuaternionFromYaw(yaw);
+
+  quat.x = tf_q.getX();
+  quat.y = tf_q.getY();
+  quat.z = tf_q.getZ();
+  quat.w = tf_q.getW();
+
+  return quat;
+}
+
+Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t)
+{
+  // Get translation
+  Eigen::Vector3d T1(
+      t.getOrigin().x(),
+      t.getOrigin().y(),
+      t.getOrigin().z()
+  );
+
+  // Get rotation matrix
+  tf::Quaternion qt = t.getRotation();
+  tf::Matrix3x3 R1(qt);
+
+  Eigen::Matrix3d R;
+  tf::matrixTFToEigen(R1,R);
+
+  // Set
+  Eigen::Matrix4d tf_eigen;
+  tf_eigen.setZero ();
+  tf_eigen.block (0, 0, 3, 3) = R;
+  tf_eigen.block (0, 3, 3, 1) = T1;
+  tf_eigen (3, 3) = 1;
+
+  return tf_eigen;
+}
+
+geometry_msgs::PoseArray computeSimpleWaypoints(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double size)
+{
+  geometry_msgs::PoseArray pose_list;
+  pcl::PointXYZ minPoint, maxPoint;
+  geometry_msgs::Point center;
+
+  double box_size = size/2;
+
+  // Find center of bounds (rough)
+  pcl::getMinMax3D(*cloud, minPoint, maxPoint);
+  center.x = (minPoint.x + maxPoint.x)/2;
+  center.y = (minPoint.y + maxPoint.y)/2;
+
+  // Compute waypoints
+  for (int i=-1; i<=1; i++)
+  {
+    for (int j=-1; j<=1; j++)
+    {
+      if (i == 0 && j == 0)
+        continue;
+
+      geometry_msgs::Pose p;
+      p.position.x = center.x + box_size*i;
+      p.position.y = center.y + box_size*j;
+
+      double yaw = atan2(-j,-i);
+      p.orientation = getQuaternionFromYaw(yaw);
+
+      pose_list.poses.push_back(p);
+    }
+  }
+
+  return pose_list;
+}
+
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
 {
   if (!isNodeEnabled)
-      return;
+    return;
 
   // Conver scan message to cloud message
   sensor_msgs::PointCloud2 cloud_msg;
@@ -255,14 +336,10 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
       usleep(100*1000);
   }
 
-  std::vector<pcl::PointXYZ> corners;
-
-  //corners = corners_list[0];
   pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud = pc_vector_clustered[0];
 
 
-  // Compute object centroid
-  std::vector<geometry_msgs::Point> pt_out;
+
 
   /*
   // Hough transform
@@ -280,67 +357,35 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
   */
 
 
+  // Transform cluster to world frame
+  pcl::PointCloud<pcl::PointXYZ>::Ptr tf_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
-  if (corners.size() == 0)
+  try
   {
-    // Create bounds based on edge alone
-    // Assume we only have a single line from the panel. Get the center of this line
-    pcl::PointXYZ minPoint, maxPoint;
-    geometry_msgs::Point center, p1, p2, p3, p4;
+    tf::StampedTransform transform;
+    Eigen::Matrix4d tf_eigen;
 
-    pcl::getMinMax3D(*cluster_cloud, minPoint, maxPoint);
-
-    center.x = (minPoint.x + maxPoint.x)/2;
-    center.y = (minPoint.y + maxPoint.y)/2;
-
-    pt_out.push_back(center);
+    tf_listener->lookupTransform("/odom", scan_msg->header.frame_id, ros::Time(0), transform);
+    tf_eigen = convertStampedTransform2Matrix4d(transform);
 
 
-    double box_size = 5/2;
-    p1.x = center.x + box_size;
-    p1.y = center.y + box_size;
+    pcl::transformPointCloud(*cluster_cloud, *tf_cloud, tf_eigen);
 
-    p2.x = center.x + box_size;
-    p2.y = center.y - box_size;
+    // Compute waypoints around object
+    geometry_msgs::PoseArray waypoints;
+    waypoints = computeSimpleWaypoints(tf_cloud, 5);
 
-    p3.x = center.x - box_size;
-    p3.y = center.y - box_size;
+    // Publish waypoints
+    waypoints.header.frame_id = "/odom";
+    pub_poses.publish(waypoints);
 
-    p4.x = center.x - box_size;
-    p4.y = center.y + box_size;
-
-    pt_out.push_back(p1);
-    pt_out.push_back(p2);
-    pt_out.push_back(p3);
-    pt_out.push_back(p4);
+    action_handler->setSuccess(waypoints);
   }
-  else
+  catch (tf::TransformException ex)
   {
-    for (int i=0; i<corners.size(); i++)
-    {
-      geometry_msgs::Point p;
-      p.x = corners[i].x;
-      p.y = corners[i].y;
-      p.z = corners[i].z;
-
-      pt_out.push_back(p);
-    }
+    ROS_ERROR("%s",ex.what());
+    return;
   }
-
-  // Draw points
-  drawPoints(pt_out, scan_msg->header.frame_id);
-
-
-
-  action_handler->setSuccess();
-
-
-
-  /*
-  // Get min and max points
-  pcl::PointXYZ minPoint, maxPoint;
-  pcl::getMinMax3D(*cluster_cloud, minPoint, maxPoint);
-  */
 
 }
 
