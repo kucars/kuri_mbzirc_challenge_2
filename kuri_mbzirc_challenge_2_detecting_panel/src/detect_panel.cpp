@@ -23,6 +23,9 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl_conversions/pcl_conversions.h>
 
+#include <actionlib/server/simple_action_server.h>
+#include <kuri_mbzirc_challenge_2_msgs/PanelPositionAction.h>
+
 #include <unistd.h>
 
 const double DEG2RAD = M_PI/180.0;
@@ -34,6 +37,8 @@ ros::Publisher  pub_wall;
 ros::Publisher  pub_lines;
 ros::Publisher  pub_points;
 tf::TransformListener *tf_listener;
+
+bool isNodeEnabled = false;
 
 typedef velodyne_pointcloud::PointXYZIR VPoint;
 typedef pcl::PointCloud<VPoint> VPointCloud;
@@ -65,6 +70,89 @@ std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
 
 
+
+
+
+
+typedef kuri_mbzirc_challenge_2_msgs::PanelPositionAction PanelPositionAction;
+typedef kuri_mbzirc_challenge_2_msgs::PanelPositionFeedback PanelPositionFeedback;
+typedef kuri_mbzirc_challenge_2_msgs::PanelPositionResult PanelPositionResult;
+typedef kuri_mbzirc_challenge_2_msgs::PanelPositionGoalConstPtr PanelPositionGoalConstPtr;
+
+
+class PanelPositionActionHandler
+{
+protected:
+
+  ros::NodeHandle nh_;
+  actionlib::SimpleActionServer<PanelPositionAction> as_; // NodeHandle instance must be created before this line. Otherwise strange error occurs.
+  std::string action_name_;
+  PanelPositionFeedback feedback_;
+  PanelPositionResult result_;
+
+public:
+
+  PanelPositionActionHandler(std::string name) :
+    as_(nh_, name, boost::bind(&PanelPositionActionHandler::executeCB, this, _1), false),
+    action_name_(name)
+  {
+    as_.start();
+  }
+
+  ~PanelPositionActionHandler(void){}
+
+  void executeCB(const PanelPositionGoalConstPtr &goal)
+  {
+    isNodeEnabled = true;
+
+    ros::Rate r(30);
+    while (1)
+    {
+      // check that preempt has not been requested by the client
+      if (as_.isPreemptRequested() || !ros::ok())
+      {
+        // set the action state to preempted
+        as_.setPreempted();
+        break;
+      }
+
+      if (!isNodeEnabled)
+      {
+        // set the action state to succeeded
+        as_.setSucceeded(result_);
+        break;
+      }
+
+      ros::spinOnce();
+      r.sleep();
+    }
+  }
+
+  void setSuccess()
+  {
+    isNodeEnabled = false;
+    result_.success = true;
+  }
+
+  void setFailure()
+  {
+    isNodeEnabled = false;
+    result_.success = false;
+  }
+
+
+};
+
+
+
+
+
+
+
+
+PanelPositionActionHandler *action_handler;
+
+
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "determine_wall");
@@ -72,6 +160,9 @@ int main(int argc, char **argv)
 
   // Topic handlers
   sub_velo  = node.subscribe("/scan", 1, callbackScan);
+
+  action_handler = new PanelPositionActionHandler("get_panel_cluster");
+
   pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
   pub_lines = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
   pub_points= node.advertise<visualization_msgs::Marker>("/explore/points", 10);
@@ -85,6 +176,9 @@ int main(int argc, char **argv)
 
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
 {
+  if (!isNodeEnabled)
+      return;
+
   // Conver scan message to cloud message
   sensor_msgs::PointCloud2 cloud_msg;
   laser_geometry::LaserProjection projector_;
@@ -139,6 +233,7 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
   if (pc_vector_clustered.size() == 0)
   {
     std::cout << "Could not find panel cluster.\n";
+    action_handler->setFailure();
     return;
   }
 
@@ -232,12 +327,12 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
     }
   }
 
-
-
   // Draw points
   drawPoints(pt_out, scan_msg->header.frame_id);
 
 
+
+  action_handler->setSuccess();
 
 
 
@@ -273,6 +368,9 @@ void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vec
     projectionTransform.block<3,3>(0,0) = eigenVectorsPCA.transpose();
     projectionTransform.block<3,1>(0,3) = -1.f * (projectionTransform.block<3,3>(0,0) * pcaCentroid.head<3>());
     pcl::PointCloud<pcl::PointXYZ>::Ptr cloudPointsProjected (new pcl::PointCloud<pcl::PointXYZ>);
+
+
+
     pcl::transformPointCloud(*cloud_plane, *cloudPointsProjected, projectionTransform);
 
     // Get the minimum and maximum points of the transformed cloud.

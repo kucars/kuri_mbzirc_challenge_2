@@ -1,8 +1,21 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(kuri_mbzirc_challenge_2)
+project(kuri_mbzirc_challenge_2_msgs)
 
 ## Find catkin macros and libraries
-find_package(catkin REQUIRED COMPONENTS roscpp)
+find_package(catkin REQUIRED COMPONENTS roscpp actionlib_msgs)
+
+add_action_files(
+    DIRECTORY action
+    FILES
+    Huskynav.action
+    PanelPosition.action
+)
+
+generate_messages(
+    DEPENDENCIES
+    actionlib_msgs
+    std_msgs
+)
 
 ###################################
 ## catkin specific configuration ##

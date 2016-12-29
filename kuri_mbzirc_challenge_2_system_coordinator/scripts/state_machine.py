@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
-import roslib; 
+import roslib;
 #import roslib.load_manifest('smach_tutorials')
 import rospy
 import smach
 import smach_ros
 import time
+
+from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction
 
 # The code is only for state machine overview. To plug in the actual code for each state, please comment out the definition in the code and include the actual code.
 
@@ -26,25 +28,27 @@ class initialization(smach.State):
         time.sleep(1)
         return 'succeeded'
 
+######
+## EXPLORATION
+######
 
 # define state : panel_searching
 class panel_searching(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['found','not_found'])
         self.search_time=0
+
+
     def execute(self, userdata):
-        rospy.loginfo('Executing state PANEAL_SEARCH')
- 
-        time.sleep(2)
-        #return 'succeeded'
+        time.sleep(1)
         if self.search_time<3:
-		rospy.loginfo('Target_not_found')
-                self.search_time+=1
-                print 'search result:'
-                print  self.search_time
-                return 'not_found'
+            rospy.loginfo('Target_not_found')
+            self.search_time+=1
+            print 'search result:'
+            print  self.search_time
+            return 'not_found'
         else:
-        	return 'found'
+            return 'found'
 
 
 
@@ -55,10 +59,8 @@ class exploration_planning(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['move_to_waypoint'])
 
-       
+
     def execute(self, userdata):
-        rospy.loginfo('Executing state EXPLORATION_PLANNING')
-        #userdata.navigation_out = userdata.navigation_in + 1
         time.sleep(1)
         return 'move_to_waypoint'
 
@@ -69,31 +71,27 @@ class move_base(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['evaluate_terminal_condition'])
 
-       
+
     def execute(self, userdata):
-        rospy.loginfo('Executing state MOVE_BASE')
-        #userdata.navigation_out = userdata.navigation_in + 1
         time.sleep(1)
         if self.preempt_requested():
                 self.service_preempt()
                 #return 'preempted'
         else:
-		return 'evaluate_terminal_condition'
+                return 'evaluate_terminal_condition'
 
 # define state : update_map
 class update_map(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['updated','preempted'])
-     
+
     def execute(self, userdata):
-        rospy.loginfo('Executing state UPDATE_MAP')
-        #userdata.update_map_out = userdata.update_map_in + 1
         time.sleep(1)
         if self.preempt_requested():
-                self.service_preempt()
-                return 'preempted'
+            self.service_preempt()
+            return 'preempted'
         else:
-		return 'updated'
+            return 'updated'
 
 
 # define state : search
@@ -103,33 +101,84 @@ class search(smach.State):
         self.search_time=0
     def execute(self, userdata):
         rospy.loginfo('Executing state SEARCH')
- 
+
         time.sleep(2)
         #return 'succeeded'
 
 
         if self.search_time<3:
-		rospy.loginfo('Target_not_found')
-                self.search_time+=1
-                print 'search result:'
-                print  self.search_time
-                return 'failed'
+            rospy.loginfo('Target_not_found')
+            self.search_time+=1
+            print 'search result:'
+            print  self.search_time
+            return 'failed'
         else:
-        	return 'succeeded'
-            
-# define state : position_infront 
-class position_infront(smach.State):
+            return 'succeeded'
+
+
+######
+## POSITIONING
+######
+
+class move_in_front_panel(smach.State):
     def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded'],
-                             output_keys=['position_infront_out'])
+        smach.State.__init__(self, outcomes=['succeeded'])
 
 
     def execute(self, userdata):
-        rospy.loginfo('Executing state POSITION_INFRONT')
-        userdata.position_infront_out = 1
         time.sleep(1)
         return 'succeeded'
-# define state : detect_wrench  
+
+class detect_panel(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['found', 'not_found', 'preempted'],
+                                   output_keys=['position_infront_out'])
+
+
+    def execute(self, userdata):
+        time.sleep(1)
+
+        if self.preempt_requested():
+            self.service_preempt()
+            return 'preempted'
+
+        userdata.position_infront_out = 1
+        return 'not_found'
+
+class move_panel_waypoints(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['not_found'])
+
+
+    def execute(self, userdata):
+        time.sleep(1)
+        return 'not_found'
+
+class move_cluster_search(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['succeeded'])
+
+
+    def execute(self, userdata):
+        time.sleep(1)
+        return 'succeeded'
+
+
+class get_panel_cluster(smach.State):
+    def __init__(self):
+        smach.State.__init__(self, outcomes=['found', 'not_found'])
+
+
+    def execute(self, userdata):
+        time.sleep(1)
+        return 'found'
+
+
+######
+## WRENCH
+######
+
+# define state : detect_wrench
 class detect_wrench(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'],
@@ -141,16 +190,16 @@ class detect_wrench(smach.State):
         userdata.detect_wrench_out = userdata.detect_wrench_in + 1
         time.sleep(1)
         return 'succeeded'
- # define state : detect_valve       
+ # define state : detect_valve
 class detect_valve(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'],
-                             input_keys=['detect_valve_in'],
+                             #input_keys=['detect_valve_in'],
                              output_keys=['detect_valve_out'])
 
     def execute(self, userdata):
         rospy.loginfo('Executing state DETECT_VALVE')
-        userdata.detect_valve_out = userdata.detect_valve_in + 1
+        userdata.detect_valve_out = 1 #userdata.detect_valve_in + 1
         time.sleep(1)
         return 'succeeded'
 
@@ -208,85 +257,132 @@ class operate_valve(smach.State):
 # main
 class Challenge2():
     def __init__(self):
-    	rospy.init_node('MBZIRC_ch2_state_machine')
+        rospy.init_node('MBZIRC_ch2_state_machine')
         # Initialize a number of parameters and variables
         self.con_input=100000;
         self.con_output=0;
         # Create a SMACH state machine
-    	self.sm = smach.StateMachine(outcomes=['Done'])
-    	self.sm.userdata.user_input = 0
-
-        # Open the container
-        self.sm_con = smach.Concurrence(outcomes=['succeeded'],
-                                        default_outcome='succeeded',
-                                        child_termination_cb=self.concurrence_child_termination_cb,
-                                        outcome_cb=self.concurrence_outcome_cb)
+        self.sm = smach.StateMachine(outcomes=['Done'])
+        self.sm.userdata.user_input = 0
 
 
+        ## Search
+        self.sm_search = smach.Concurrence(
+                              outcomes=['succeeded'],
+                              default_outcome='succeeded',
+                              child_termination_cb=self.sm_search_con_termination,
+                              outcome_cb=self.concurrence_outcome_cb)
 
         self.exploring=smach.StateMachine(outcomes=['terminated'])
         with self.exploring:
-        # Add states to the container
-        	smach.StateMachine.add('SEARCHING_PANEL_IN_MAP', panel_searching(), 
-                               	transitions={'not_found':'EXPLORATION_PLANNING','found':'terminated'})
-        # Add states to the container
-        	smach.StateMachine.add('EXPLORATION_PLANNING', exploration_planning(), 
-                               	transitions={'move_to_waypoint':'MOVE_BASE'})
-        # add the concurrent to the main state machine
-        	smach.StateMachine.add('MOVE_BASE', move_base(),
-                               transitions={'evaluate_terminal_condition':'SEARCHING_PANEL_IN_MAP'})
+            # Add states to the container
+            smach.StateMachine.add('SEARCHING_PANEL_IN_MAP', panel_searching(),
+                            transitions={'not_found':'EXPLORATION_PLANNING','found':'terminated'})
+            # Add states to the container
+            smach.StateMachine.add('EXPLORATION_PLANNING', exploration_planning(),
+                            transitions={'move_to_waypoint':'MOVE_BASE'})
+            # add the concurrent to the main state machine
+            smach.StateMachine.add('MOVE_BASE', move_base(),
+                            transitions={'evaluate_terminal_condition':'SEARCHING_PANEL_IN_MAP'})
 
-         
+
+
         self.update_map=smach.StateMachine(outcomes=['preempted'])
         with self.update_map:
         # Add states to the container
-        	smach.StateMachine.add('UPDATING_MAP', update_map(), 
-                               	transitions={'updated':'UPDATING_MAP'})   
+            smach.StateMachine.add('UPDATING_MAP', update_map(),
+                            transitions={'updated':'UPDATING_MAP'})
 
-        with self.sm_con:
-         	smach.Concurrence.add('EXPLORING', self.exploring)
-           	smach.Concurrence.add('UPDATING_MAP', self.update_map)
+        with self.sm_search:
+            smach.Concurrence.add('EXPLORING', self.exploring)
+            smach.Concurrence.add('UPDATING_MAP', self.update_map)
 
 
+        ## POSITION
+        self.sm_positioning = smach.Concurrence(
+                              outcomes=['succeeded', 'failed'],
+                              default_outcome='succeeded',
+                              child_termination_cb=self.sm_positioning_con_termination,
+                              #outcome_cb=self.concurrence_outcome_cb
+                              )
+
+        def result_cb(user_data, status, result):
+            if (result.success):
+                return 'succeeded'
+            else:
+                return 'aborted'
+
+
+        self.circumnavigating=smach.StateMachine(outcomes=['terminated', 'failed', 'preempted'])
+        with self.circumnavigating:
+
+            smach.StateMachine.add('GET_PANEL_CLUSTER',
+                            smach_ros.SimpleActionState('get_panel_cluster', PanelPositionAction,
+                                result_cb = result_cb), #get_panel_cluster(),
+                            transitions={'aborted':'MOVE_CLUSTER_SEARCH','succeeded':'MOVE_PANEL_WAYPOINTS'})
+
+            smach.StateMachine.add('MOVE_CLUSTER_SEARCH', move_cluster_search(),
+                            transitions={'succeeded':'GET_PANEL_CLUSTER'})
+
+            smach.StateMachine.add('MOVE_PANEL_WAYPOINTS', move_panel_waypoints(),
+                            transitions={'not_found':'failed'})
+
+
+        self.detect_panel=smach.StateMachine(outcomes=['terminated', 'preempted'])
+        with self.detect_panel:
+            # Add states to the container
+            smach.StateMachine.add('DETECTING_PANEL', detect_panel(),
+                            transitions={'found':'MOVE_IN_FRONT_PANEL',
+                                         'not_found': 'DETECTING_PANEL',
+                                         'preempted': 'preempted'})
+
+            smach.StateMachine.add('MOVE_IN_FRONT_PANEL', move_in_front_panel(),
+                            transitions={'succeeded':'terminated'})
+
+        with self.sm_positioning:
+            smach.Concurrence.add('CIRCUMNAVIGATING', self.circumnavigating)
+            smach.Concurrence.add('DETECTING_PANEL', self.detect_panel)
 
         # Open the container
-    	with self.sm:
-        # Add states to the container
-        	smach.StateMachine.add('INITIATING', initialization(500000), 
-                               	transitions={'succeeded':'SEARCHING_PANEL'},
-                               	remapping={'init_params':'user_input', 
-                                           'init_out':'start_info'})
-        # add the concurrent to the main state machine
-        	smach.StateMachine.add('SEARCHING_PANEL', self.sm_con,
-                               transitions={'succeeded':'POSITIONING_INFRONT'})
-                
-        	smach.StateMachine.add('POSITIONING_INFRONT', position_infront(), 
-                               transitions={'succeeded':'DETECTING_VALVE'},
-                               remapping={'position_infront_out':'panel_pose'})
+        with self.sm:
+            # Add states to the container
+            smach.StateMachine.add('INITIATING', initialization(500000),
+                            transitions={'succeeded':'SEARCHING_PANEL'},
+                            remapping={'init_params':'user_input',
+                                       'init_out':'start_info'})
+            # add the concurrent to the main state machine
+            smach.StateMachine.add('SEARCHING_PANEL', self.sm_search,
+                           transitions={'succeeded':'POSITIONING_IN_FRONT'})
 
-       		smach.StateMachine.add('DETECTING_VALVE', detect_valve(), 
-                               transitions={'succeeded':'DETECTING_WRENCH'},
-                               remapping={'detect_valve_in':'panel_pose', 
-                                          	  'detect_valve_out':'valve_pose'})
-        	smach.StateMachine.add('DETECTING_WRENCH', detect_wrench(), 
-                               transitions={'succeeded':'CALCULATING_GRIP_POSE'},
-                               remapping={'detect_wrench_in':'panel_pose', 
-                                          'detect_wrench_out':'wrench_pose'})
-        	smach.StateMachine.add('CALCULATING_GRIP_POSE', grip_pose_calculation(), 
-                               transitions={'succeeded':'PICKING_WRENCH'},
-                               remapping={'grip_pose_calculation_in':'wrench_pose', 
-                                                  'grip_pose_calculation_out':'grip_pose'})
-        	smach.StateMachine.add('PICKING_WRENCH', pick_wrench(), 
-                               transitions={'succeeded':'MOVING_TO_VALVE'},
-                               remapping={'pick_wrench_in':'grip_pose'})
-        	smach.StateMachine.add('MOVING_TO_VALVE', move_to_valve(), 
-                               transitions={'succeeded':'OPERATING_VALVE'},
-                               remapping={'move_to_valve_in':'valve_pose'})      
-        	smach.StateMachine.add('OPERATING_VALVE', operate_valve(), 
-                               transitions={'succeeded':'Done'},
-                               remapping={'operate_valve_in':'valve_pose'})
+            smach.StateMachine.add('POSITIONING_IN_FRONT', self.sm_positioning,
+                           transitions={'succeeded':'DETECTING_VALVE',
+                                        'failed':'SEARCHING_PANEL'},
+                           #remapping={'position_infront_out':'panel_pose'}
+                           )
 
-   
+            smach.StateMachine.add('DETECTING_VALVE', detect_valve(),
+                           transitions={'succeeded':'DETECTING_WRENCH'},
+                           remapping={#'detect_valve_in':'panel_pose',
+                                      'detect_valve_out':'valve_pose'})
+            smach.StateMachine.add('DETECTING_WRENCH', detect_wrench(),
+                           transitions={'succeeded':'CALCULATING_GRIP_POSE'},
+                           remapping={'detect_wrench_in':'valve_pose',
+                                      'detect_wrench_out':'wrench_pose'})
+            smach.StateMachine.add('CALCULATING_GRIP_POSE', grip_pose_calculation(),
+                           transitions={'succeeded':'PICKING_WRENCH'},
+                           remapping={'grip_pose_calculation_in':'wrench_pose',
+                                      'grip_pose_calculation_out':'grip_pose'})
+            smach.StateMachine.add('PICKING_WRENCH', pick_wrench(),
+                           transitions={'succeeded':'MOVING_TO_VALVE'},
+                           remapping={'pick_wrench_in':'grip_pose'})
+            smach.StateMachine.add('MOVING_TO_VALVE', move_to_valve(),
+                           transitions={'succeeded':'OPERATING_VALVE'},
+                           remapping={'move_to_valve_in':'valve_pose'})
+            smach.StateMachine.add('OPERATING_VALVE', operate_valve(),
+                           transitions={'succeeded':'Done'},
+                           remapping={'operate_valve_in':'valve_pose'})
+
+
         sis = smach_ros.IntrospectionServer('server_name', self.sm, '/SM_ROOT')
         sis.start()
 
@@ -299,15 +395,15 @@ class Challenge2():
 
     # Define callback function for the concuerrent container
     # Gets called when ANY child state terminates
-    def concurrence_child_termination_cb(self, outcome_map):
+    def sm_search_con_termination(self, outcome_map):
         # If the current navigation task has succeeded, return True
         print 'Child_termination'
-    	if outcome_map['EXPLORING'] == 'terminated':
-                print 'preempt all the rest'
-        	return True
-   	else:
-                return False
-    
+        if outcome_map['EXPLORING'] == 'terminated':
+            print 'preempt all the rest'
+            return True
+        else:
+            return False
+
     # Gets called when ALL child states are terminated
     def concurrence_outcome_cb(self, outcome_map):
         print 'concurrent_terminated'
@@ -317,11 +413,25 @@ class Challenge2():
         print self.con_output
 
 
-    	rospy.loginfo('Existing state CON')
-    	time.sleep(1)
-    	return 'succeeded'
+        rospy.loginfo('Existing state CON')
+        time.sleep(1)
+        return 'succeeded'
 
-        
+
+
+
+    # Define callback function for the concuerrent container
+    # Gets called when ANY child state terminates
+    def sm_positioning_con_termination(self, outcome_map):
+        # If the current navigation task has succeeded, return True
+        print 'Positioning termination'
+        if outcome_map['CIRCUMNAVIGATING'] == 'failed':
+            print 'preempt all the rest'
+            return True
+        else:
+            return False
+
+
 
 
 
