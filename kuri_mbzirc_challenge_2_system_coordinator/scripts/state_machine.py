@@ -1,17 +1,32 @@
 #!/usr/bin/env python
 
-import roslib;
-#import roslib.load_manifest('smach_tutorials')
+import roslib
 import rospy
 import smach
 import smach_ros
 import time
 
+import actionlib
+
 from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction
+from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 # The code is only for state machine overview. To plug in the actual code for each state, please comment out the definition in the code and include the actual code.
 
 # Orson Lin 10.09.2016
+
+
+
+
+rospy.init_node('MBZIRC_ch2_state_machine')
+navigationActionServer = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
+rospy.loginfo("Connecting to the move Action Server")
+navigationActionServer.wait_for_server()
+rospy.loginfo("Ready ...")
+
+
+
+
 
 
 # define state : initialization
@@ -152,7 +167,18 @@ class move_panel_waypoints(smach.State):
 
     def execute(self, userdata):
         print("Found " + str(len(userdata.waypoints.poses)) + " waypoints on frame " + userdata.waypoints.header.frame_id)
-        time.sleep(1)
+
+        for i in range (len(userdata.waypoints.poses)):
+            goal = MoveBaseGoal()
+            goal.target_pose.header.frame_id = userdata.waypoints.header.frame_id
+            goal.target_pose.pose = userdata.waypoints.poses[i]
+
+            rospy.loginfo("Moving Robot to the desired configuration in front of panel")
+            navigationActionServer.send_goal(goal)
+            rospy.loginfo("Waiting for Robot to reach the desired configuration in front of panel")
+            navigationActionServer.wait_for_result()
+
+        #time.sleep(1)
         return 'not_found'
 
 class move_cluster_search(smach.State):
@@ -258,7 +284,6 @@ class operate_valve(smach.State):
 # main
 class Challenge2():
     def __init__(self):
-        rospy.init_node('MBZIRC_ch2_state_machine')
         # Initialize a number of parameters and variables
         self.con_input=100000;
         self.con_output=0;

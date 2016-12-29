@@ -69,7 +69,7 @@ class mbzirc_c2_auto():
 
 
     # Define waypoints
-    self.waypoints.append(Pose(Point(0.2, -0.2, 0.0), quaternions[0]))
+    self.waypoints.append(Pose(Point(1, 0, 0.0), quaternions[0]))
 
     # Cycle through the waypoints
     for i in range(0, len(self.waypoints) ):
