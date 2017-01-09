@@ -1,7 +1,7 @@
 # Define the goal
-geometry_msgs/PoseArray waypoints
+
 ---
 # Define the result
-bool success
+geometry_msgs/Point[] ROI
 ---
 # Define a feedback message

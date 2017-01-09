@@ -8,24 +8,12 @@ import time
 
 import actionlib
 
-from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction
+from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction, HuskynavAction
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 # The code is only for state machine overview. To plug in the actual code for each state, please comment out the definition in the code and include the actual code.
 
 # Orson Lin 10.09.2016
-
-
-
-
-rospy.init_node('MBZIRC_ch2_state_machine')
-navigationActionServer = actionlib.SimpleActionClient('/move_base', MoveBaseAction)
-rospy.loginfo("Connecting to the move Action Server")
-navigationActionServer.wait_for_server()
-rospy.loginfo("Ready ...")
-
-
-
 
 
 
@@ -56,7 +44,7 @@ class panel_searching(smach.State):
 
     def execute(self, userdata):
         time.sleep(1)
-        if self.search_time<3:
+        if self.search_time<2:
             rospy.loginfo('Target_not_found')
             self.search_time+=1
             print 'search result:'
@@ -121,7 +109,7 @@ class search(smach.State):
         #return 'succeeded'
 
 
-        if self.search_time<3:
+        if self.search_time<2:
             rospy.loginfo('Target_not_found')
             self.search_time+=1
             print 'search result:'
@@ -158,27 +146,6 @@ class detect_panel(smach.State):
             return 'preempted'
 
         userdata.position_infront_out = 1
-        return 'not_found'
-
-class move_panel_waypoints(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['not_found'], input_keys=['waypoints'])
-
-
-    def execute(self, userdata):
-        print("Found " + str(len(userdata.waypoints.poses)) + " waypoints on frame " + userdata.waypoints.header.frame_id)
-
-        for i in range (len(userdata.waypoints.poses)):
-            goal = MoveBaseGoal()
-            goal.target_pose.header.frame_id = userdata.waypoints.header.frame_id
-            goal.target_pose.pose = userdata.waypoints.poses[i]
-
-            rospy.loginfo("Moving Robot to the desired configuration in front of panel")
-            navigationActionServer.send_goal(goal)
-            rospy.loginfo("Waiting for Robot to reach the desired configuration in front of panel")
-            navigationActionServer.wait_for_result()
-
-        #time.sleep(1)
         return 'not_found'
 
 class move_cluster_search(smach.State):
@@ -336,9 +303,11 @@ class Challenge2():
         with self.circumnavigating:
 
             smach.StateMachine.add('GET_PANEL_CLUSTER',
-                            smach_ros.SimpleActionState('get_panel_cluster', PanelPositionAction,
+                            smach_ros.SimpleActionState(
+                                'get_panel_cluster', PanelPositionAction,
                                 result_cb = self.get_panel_cluster_result_cb,
-                                output_keys = ['waypoints']),
+                                output_keys = ['waypoints']
+                            ),
                             transitions={'aborted':'MOVE_CLUSTER_SEARCH','succeeded':'MOVE_PANEL_WAYPOINTS'},
                             remapping={'waypoints':'cluster_waypoints'}
                             )
@@ -346,8 +315,12 @@ class Challenge2():
             smach.StateMachine.add('MOVE_CLUSTER_SEARCH', move_cluster_search(),
                             transitions={'succeeded':'GET_PANEL_CLUSTER'})
 
-            smach.StateMachine.add('MOVE_PANEL_WAYPOINTS', move_panel_waypoints(),
-                            transitions={'not_found':'failed'},
+            smach.StateMachine.add('MOVE_PANEL_WAYPOINTS',
+                            smach_ros.SimpleActionState(
+                                'husky_navigate', HuskynavAction,
+                                goal_slots=['waypoints']
+                            ),
+                            transitions={'aborted':'failed','succeeded':'terminated'},
                             remapping={'waypoints':'cluster_waypoints'}
                             )
 
@@ -471,4 +444,5 @@ class Challenge2():
 
 
 if __name__ == '__main__':
+    rospy.init_node('MBZIRC_ch2_state_machine')
     Challenge2()

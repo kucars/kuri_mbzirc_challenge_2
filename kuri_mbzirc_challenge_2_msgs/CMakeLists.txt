@@ -13,6 +13,7 @@ add_action_files(
     FILES
     Huskynav.action
     PanelPosition.action
+    WrenchDetection.action
 )
 
 generate_messages(

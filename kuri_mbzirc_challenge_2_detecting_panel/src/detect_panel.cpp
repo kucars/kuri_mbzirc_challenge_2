@@ -33,49 +33,6 @@
 const double DEG2RAD = M_PI/180.0;
 const double RAD2DEG = 1/DEG2RAD;
 
-ros::Subscriber sub_velo;
-ros::Subscriber sub_scan;
-ros::Publisher  pub_wall;
-ros::Publisher  pub_lines;
-ros::Publisher  pub_points;
-ros::Publisher  pub_poses;
-tf::TransformListener *tf_listener;
-
-bool isNodeEnabled = false;
-
-typedef velodyne_pointcloud::PointXYZIR VPoint;
-typedef pcl::PointCloud<VPoint> VPointCloud;
-
-struct HoughLine
-{
-    double r;
-    double angle;
-    int votes;
-
-    bool operator<(const HoughLine & other) const
-    {
-        return (votes > other.votes);
-    }
-};
-
-// ======
-// Prototypes
-// ======
-void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners);
-void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector);
-
-void drawHoughLine(std::vector<HoughLine> lines, std::string frame_id);
-void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
-std::vector<geometry_msgs::Point> findCorners(std::vector<HoughLine> lines);
-std::vector<double> generateRange(double start, double end, double step);
-std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hough);
-
-void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
-
-
-
-
-
 
 typedef kuri_mbzirc_challenge_2_msgs::PanelPositionAction PanelPositionAction;
 typedef kuri_mbzirc_challenge_2_msgs::PanelPositionFeedback PanelPositionFeedback;
@@ -94,11 +51,13 @@ protected:
   PanelPositionResult result_;
 
 public:
+  bool is_node_enabled;
 
   PanelPositionActionHandler(std::string name) :
     as_(nh_, name, boost::bind(&PanelPositionActionHandler::executeCB, this, _1), false),
     action_name_(name)
   {
+    is_node_enabled = false;
     as_.start();
   }
 
@@ -106,7 +65,7 @@ public:
 
   void executeCB(const PanelPositionGoalConstPtr &goal)
   {
-    isNodeEnabled = true;
+    is_node_enabled = true;
 
     ros::Rate r(30);
     while (1)
@@ -119,7 +78,7 @@ public:
         break;
       }
 
-      if (!isNodeEnabled)
+      if (!is_node_enabled)
       {
         // set the action state to succeeded
         as_.setSucceeded(result_);
@@ -133,14 +92,16 @@ public:
 
   void setSuccess(geometry_msgs::PoseArray waypoints)
   {
-    isNodeEnabled = false;
+    is_node_enabled = false;
+
     result_.success = true;
     result_.waypoints = waypoints;
   }
 
   void setFailure()
   {
-    isNodeEnabled = false;
+    is_node_enabled = false;
+
     result_.success = false;
   }
 
@@ -148,14 +109,52 @@ public:
 };
 
 
+typedef velodyne_pointcloud::PointXYZIR VPoint;
+typedef pcl::PointCloud<VPoint> VPointCloud;
+
+struct HoughLine
+{
+    double r;
+    double angle;
+    int votes;
+
+    bool operator<(const HoughLine & other) const
+    {
+        return (votes > other.votes);
+    }
+};
 
 
 
+// ======
+// Prototypes
+// ======
+void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners);
+void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector);
+
+void drawHoughLine(std::vector<HoughLine> lines, std::string frame_id);
+void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
+std::vector<geometry_msgs::Point> findCorners(std::vector<HoughLine> lines);
+std::vector<double> generateRange(double start, double end, double step);
+std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hough);
+
+void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
 
 
+// =====
+// Variables
+// =====
+ros::Subscriber sub_velo;
+ros::Subscriber sub_scan;
+ros::Publisher  pub_wall;
+ros::Publisher  pub_lines;
+ros::Publisher  pub_points;
+ros::Publisher  pub_poses;
+tf::TransformListener *tf_listener;
 
 PanelPositionActionHandler *action_handler;
-
+bool bypass_action_handler = false;
+std::string actionlib_topic = "get_panel_cluster";
 
 int main(int argc, char **argv)
 {
@@ -165,7 +164,7 @@ int main(int argc, char **argv)
   // Topic handlers
   sub_velo  = node.subscribe("/scan", 1, callbackScan);
 
-  action_handler = new PanelPositionActionHandler("get_panel_cluster");
+  action_handler = new PanelPositionActionHandler(actionlib_topic);
 
   pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
   pub_lines = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
@@ -173,7 +172,18 @@ int main(int argc, char **argv)
   pub_poses = node.advertise<geometry_msgs::PoseArray>("/explore/poses", 10);
 
   tf_listener = new tf::TransformListener();
-  //isNodeEnabled = true; //For node test
+
+  // Parse input
+  if (argc > 1)
+  {
+    // Enable node without waiting for actionlib calls
+    bypass_action_handler = true;
+    std::cout << "Bypassing actionlib\n";
+  }
+  else
+  {
+    std::cout << "Waiting for messages on the \"" << actionlib_topic << "\" actionlib topic\n";
+  }
 
   ros::spin();
   return 0;
@@ -257,10 +267,10 @@ geometry_msgs::PoseArray computeSimpleWaypoints(pcl::PointCloud<pcl::PointXYZ>::
 
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
 {
-  if (!isNodeEnabled)
+  if (!action_handler->is_node_enabled && !bypass_action_handler)
     return;
 
-  // Conver scan message to cloud message
+  // Convert scan message to cloud message
   sensor_msgs::PointCloud2 cloud_msg;
   laser_geometry::LaserProjection projector_;
   projector_.projectLaser(*scan_msg, cloud_msg);
