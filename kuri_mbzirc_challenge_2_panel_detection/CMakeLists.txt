@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(kuri_mbzirc_challenge_2_detecting_panel)
+project(kuri_mbzirc_challenge_2_panel_detection)
 
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS

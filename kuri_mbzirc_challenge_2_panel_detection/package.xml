@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>kuri_mbzirc_challenge_2_detecting_panel</name>
+  <name>kuri_mbzirc_challenge_2_panel_detection</name>
   <version>0.1.0</version>
   <description>MBZIRC Challenge 2 Panel Detection</description>
 
