@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
 <launch>
-  <node pkg="kuri_mbzirc_challenge_2_detecting_panel" type="detect_panel" name="detect_panel" args=""/>
-  <node pkg="kuri_mbzirc_challenge_2" type="huskynavigation_action_server.py" name="husky_navigation_server" args=""/>
+  <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="detect_panel" name="detect_panel" args="" output="screen"/>
+  <node pkg="kuri_mbzirc_challenge_2" type="huskynavigation_action_server.py" name="husky_navigation_server" args="" output="screen"/>
 </launch>
