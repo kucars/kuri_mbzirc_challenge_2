@@ -10,6 +10,7 @@ Updated by: Dongming
 import rospy
 import actionlib
 import math
+from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from kuri_mbzirc_challenge_2_msgs.msg import HuskynavAction, HuskynavResult
 
@@ -31,17 +32,28 @@ class Huskynavigationserver:
             goal = self.generateGoal(goal_msg.waypoints.header.frame_id, w)
             self.navigationActionServer.send_goal(goal)
 
-            self.navigationActionServer.wait_for_result()
+            # Check if we got preempted while navigating
+            r = rospy.Rate(30)
+            while (not rospy.is_shutdown() and not self.server.is_preempt_requested() and self.navigationActionServer.simple_state != actionlib.SimpleGoalState.DONE ):
+                r.sleep()
 
-            navResult  = self.navigationActionServer.get_result()
-            navState   = self.navigationActionServer.get_state()
+            if (rospy.is_shutdown() or self.server.is_preempt_requested()):
+                # End current movement
+                rospy.loginfo("Stopping the robot...")
+                self.navigationActionServer.cancel_goal()
+                rospy.sleep(2)
 
-            """
-            if navResult == 3:
-                result.success = True
-                rospy.loginfo("Husky navigation Succeeded")
-                server.set_succeeded(result)
-            """
+                cmd_vel_pub = rospy.Publisher('cmd_vel', Twist, queue_size=5)
+                cmd_vel_pub.publish(Twist())
+                rospy.sleep(1)
+
+
+                # Tell the server that we got preempted
+                self.server.set_preempted()
+
+                return
+
+            # Everything was okay, we reached our goal. Execute next waypoint
 
         result = HuskynavResult()
         result.success = True

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on 10/04/2016
-@author: Tarek Taha
+@author: Tarek Taha, Abdullah Abduldayem
 
 Naive code to perform static exploration
 
@@ -20,9 +20,9 @@ from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion, PoseWithCov
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
-from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction
+from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction, PanelPositionResult
 
-topic_name = "detect_panel"
+topic_name = "panel_waypoint"
 
 class mbzirc_panel_track():
     def __init__(self):
@@ -31,7 +31,7 @@ class mbzirc_panel_track():
         ############
         ## Variables
         ############
-        self.desired_dist = 2.2
+        self.desired_dist = 0.7
 
         self.is_node_enabled = False
         self.current_pose = [0,0,0,0]
@@ -56,6 +56,20 @@ class mbzirc_panel_track():
         # This node was called, perform any necessary changes here
         self.is_node_enabled = True
         rospy.loginfo("panel_waypoint node enabled")
+
+        # Wait until we've detected the panel
+        r = rospy.Rate(30)
+        while (self.is_node_enabled and not rospy.is_shutdown() and not self.server.is_preempt_requested()):
+            r.sleep()
+
+        if (rospy.is_shutdown()):
+            return
+
+        if self.server.is_preempt_requested():
+            self.server.set_preempted()
+            return
+
+        self.server.set_succeeded(self.result_)
 
 
     def poseCallback(self, data):
@@ -100,18 +114,16 @@ class mbzirc_panel_track():
         # Calculate target position
         x_goal =   self.marker_position.z - self.desired_dist*cos(self.marker_angle)
         y_goal = -(self.marker_position.x - self.desired_dist*sin(self.marker_angle))
-        #print("x_d = " + str(round(x_goal,3)) + " y_d = " + str(round(y_goal,3)) + " a = " + str(round(degrees(self.marker_angle))) )
+        print("x_d = " + str(round(x_goal,3)) + " y_d = " + str(round(y_goal,3)) + " a = " + str(round(degrees(self.marker_angle))) )
 
         # Generate goal
         pose = [x_goal, y_goal, 0, self.marker_angle]
         goal = self.generateRelativePositionGoal(pose)
 
         # Return target waypoint
-        result = PanelPositionResult()
-        result.success = True
-        result.waypoints = goal
-
-        self.server.set_succeeded(result)
+        self.result_ = PanelPositionResult()
+        self.result_.success = True
+        self.result_.waypoints = goal
 
         # Disable the node since it found its target
         self.is_node_enabled = False

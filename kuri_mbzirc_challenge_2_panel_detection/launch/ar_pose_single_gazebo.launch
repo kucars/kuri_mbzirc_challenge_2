@@ -9,7 +9,7 @@
     <param name="marker_width" type="double" value="295"/>
     <param name="marker_center_x" type="double" value="0.0"/>
     <param name="marker_center_y" type="double" value="0.0"/>
-    <param name="threshold" type="int" value="100"/>
+    <param name="threshold" type="int" value="130"/>
     <param name="use_history" type="bool" value="true"/>
     
     <remap from="/camera/camera_info" to="/camera/rgb/camera_info"/>
