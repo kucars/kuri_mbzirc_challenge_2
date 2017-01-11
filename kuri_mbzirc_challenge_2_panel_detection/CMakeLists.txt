@@ -39,11 +39,6 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 
-
-add_executable(determine_wall src/determine_wall.cpp)
-target_link_libraries(determine_wall ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-add_dependencies(determine_wall ${catkin_EXPORTED_TARGETS})
-
-add_executable(detect_panel src/detect_panel.cpp)
-target_link_libraries(detect_panel ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-add_dependencies(detect_panel ${catkin_EXPORTED_TARGETS})
+add_executable(circumnavigation_waypoints src/circumnavigation_waypoints.cpp)
+target_link_libraries(circumnavigation_waypoints ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(circumnavigation_waypoints ${catkin_EXPORTED_TARGETS})

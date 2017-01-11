@@ -123,31 +123,6 @@ class search(smach.State):
 ## POSITIONING
 ######
 
-class move_in_front_panel(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded'])
-
-
-    def execute(self, userdata):
-        time.sleep(1)
-        return 'succeeded'
-
-class detect_panel(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['found', 'not_found', 'preempted'],
-                                   output_keys=['position_infront_out'])
-
-
-    def execute(self, userdata):
-        time.sleep(1)
-
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
-
-        userdata.position_infront_out = 1
-        return 'not_found'
-
 class move_cluster_search(smach.State):
     def __init__(self):
         smach.State.__init__(self, outcomes=['succeeded'])
@@ -156,16 +131,6 @@ class move_cluster_search(smach.State):
     def execute(self, userdata):
         time.sleep(1)
         return 'succeeded'
-
-
-class get_panel_cluster(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['found', 'not_found'])
-
-
-    def execute(self, userdata):
-        time.sleep(1)
-        return 'found'
 
 
 ######
@@ -325,16 +290,29 @@ class Challenge2():
                             )
 
 
-        self.detect_panel=smach.StateMachine(outcomes=['terminated', 'preempted'])
+        self.detect_panel=smach.StateMachine(outcomes=['terminated', 'failed', 'preempted'])
         with self.detect_panel:
             # Add states to the container
-            smach.StateMachine.add('DETECTING_PANEL', detect_panel(),
-                            transitions={'found':'MOVE_IN_FRONT_PANEL',
-                                         'not_found': 'DETECTING_PANEL',
-                                         'preempted': 'preempted'})
+            smach.StateMachine.add('DETECTING_PANEL',
+                            smach_ros.SimpleActionState(
+                                'get_panel_cluster', PanelPositionAction,
+                                result_cb = self.get_panel_cluster_result_cb,
+                                output_keys = ['waypoints']
+                            ),
+                            transitions={'aborted':'DETECTING_PANEL',
+                                         'succeeded':'MOVE_IN_FRONT_PANEL',
+                                         'preempted': 'preempted'},
+                            remapping={'waypoints':'panel_waypoint'}
+                            )
 
-            smach.StateMachine.add('MOVE_IN_FRONT_PANEL', move_in_front_panel(),
-                            transitions={'succeeded':'terminated'})
+            smach.StateMachine.add('MOVE_IN_FRONT_PANEL',
+                            smach_ros.SimpleActionState(
+                                'husky_navigate', HuskynavAction,
+                                goal_slots=['waypoints']
+                            ),
+                            transitions={'aborted':'failed','succeeded':'terminated'},
+                            remapping={'waypoints':'panel_waypoint'}
+                            )
 
         with self.sm_positioning:
             smach.Concurrence.add('CIRCUMNAVIGATING', self.circumnavigating)
@@ -428,6 +406,16 @@ class Challenge2():
         else:
             return False
 
+
+
+    ## DETECT_PANEL
+    def detect_panel_result_cb(self, userdata, status, result):
+        if (result.success):
+            userdata.waypoints = result.waypoints;
+            print("Found the panel!")
+            return 'succeeded'
+        else:
+            return 'aborted'
 
     ## GET_PANEL_CLUSTER
     def get_panel_cluster_result_cb(self, userdata, status, result):

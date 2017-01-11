@@ -5,6 +5,7 @@
 #include "geometry_msgs/PoseArray.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "sensor_msgs/LaserScan.h"
+#include "nav_msgs/Odometry.h"
 #include "visualization_msgs/Marker.h"
 
 #include <tf/transform_listener.h>
@@ -139,12 +140,13 @@ std::vector<double> generateRange(double start, double end, double step);
 std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hough);
 
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
+void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
 
 
 // =====
 // Variables
 // =====
-ros::Subscriber sub_velo;
+ros::Subscriber sub_odom;
 ros::Subscriber sub_scan;
 ros::Publisher  pub_wall;
 ros::Publisher  pub_lines;
@@ -155,14 +157,16 @@ tf::TransformListener *tf_listener;
 PanelPositionActionHandler *action_handler;
 bool bypass_action_handler = false;
 std::string actionlib_topic = "get_panel_cluster";
+nav_msgs::Odometry current_odom;
 
 int main(int argc, char **argv)
 {
-  ros::init(argc, argv, "determine_wall");
+  ros::init(argc, argv, "circumnavigation_waypoints");
   ros::NodeHandle node;
 
   // Topic handlers
-  sub_velo  = node.subscribe("/scan", 1, callbackScan);
+  sub_scan  = node.subscribe("/scan", 1, callbackScan);
+  sub_odom  = node.subscribe("/odometry/filtered", 1, callbackOdom);
 
   action_handler = new PanelPositionActionHandler(actionlib_topic);
 
@@ -232,6 +236,14 @@ Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t)
 
 geometry_msgs::PoseArray computeSimpleWaypoints(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double size)
 {
+  // Wait until we have odometry data
+  if (! &current_odom) //Check if pointer is null
+  {
+    ros::Rate r(30);
+    ros::spinOnce();
+    r.sleep();
+  }
+
   geometry_msgs::PoseArray pose_list;
   pcl::PointXYZ minPoint, maxPoint;
   geometry_msgs::Point center;
@@ -243,26 +255,68 @@ geometry_msgs::PoseArray computeSimpleWaypoints(pcl::PointCloud<pcl::PointXYZ>::
   center.x = (minPoint.x + maxPoint.x)/2;
   center.y = (minPoint.y + maxPoint.y)/2;
 
+
+  // Make sure we generate waypoints in clockwise order in 3x3 grid
+  const int pair_count = 8*2;
+  static const int ij_pairs[] = {-1,-1,
+                                -1, 0,
+                                -1, 1,
+                                 0, 1,
+                                 1, 1,
+                                 1, 0,
+                                 1,-1,
+                                 0,-1};
+
   // Compute waypoints
-  for (int i=-1; i<=1; i++)
+  std::vector<geometry_msgs::Pose> temp_poses;
+  for (int m=0; m<pair_count; m+=2)
   {
-    for (int j=-1; j<=1; j++)
+    int i = ij_pairs[m];
+    int j = ij_pairs[m+1];
+
+    geometry_msgs::Pose p;
+    p.position.x = center.x + box_size*i;
+    p.position.y = center.y + box_size*j;
+
+    double yaw = atan2(-j,-i);
+    p.orientation = getQuaternionFromYaw(yaw);
+
+    temp_poses.push_back(p);
+  }
+
+  // Find closest waypoint
+  double min_dist = 1/.0;
+  int min_dist_idx = 0;
+  for (int i=0; i<temp_poses.size(); i++)
+  {
+    double x = temp_poses[i].position.x - current_odom.pose.pose.position.x;
+    double y = temp_poses[i].position.y - current_odom.pose.pose.position.y;
+
+    double d = x*x + y*y;
+
+    if (d < min_dist)
     {
-      if (i == 0 && j == 0)
-        continue;
-
-      geometry_msgs::Pose p;
-      p.position.x = center.x + box_size*i;
-      p.position.y = center.y + box_size*j;
-
-      double yaw = atan2(-j,-i);
-      p.orientation = getQuaternionFromYaw(yaw);
-
-      pose_list.poses.push_back(p);
+      min_dist = d;
+      min_dist_idx = i;
     }
   }
 
+  // Order waypoints
+  for (int i=min_dist_idx; i<temp_poses.size(); i++)
+    pose_list.poses.push_back( temp_poses[i] );
+
+  for (int i=0; i<min_dist_idx; i++)
+    pose_list.poses.push_back( temp_poses[i] );
+
   return pose_list;
+}
+
+void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg)
+{
+  if (!action_handler->is_node_enabled && !bypass_action_handler)
+    return;
+
+  current_odom = *odom_msg;
 }
 
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
@@ -298,6 +352,13 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
       continue;
 
     cloud_filtered->points.push_back (p);
+  }
+
+  if (cloud_filtered->points.size() == 0)
+  {
+    std::cout << "No laser points detected nearby.\n";
+    action_handler->setFailure();
+    return;
   }
 
 
