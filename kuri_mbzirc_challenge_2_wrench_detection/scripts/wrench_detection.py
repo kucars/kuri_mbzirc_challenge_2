@@ -88,9 +88,9 @@ class WrenchDetectionServer:
 	output = img.copy()
 
 	gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-	blurred = cv2.GaussianBlur(gray, (7, 7), 0)
-	thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)[1]
-	thresh2 = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV,3,2)
+	blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+	#thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)[1]
+	thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV,3,2)
 
 	# perform edge detection, then perform a dilation + erosion to close gaps in between object edges
 	edged = cv2.Canny(blurred, 20, 150)
@@ -98,14 +98,11 @@ class WrenchDetectionServer:
 	edged = cv2.erode(edged, None, iterations=1)
 	edged = cv2.erode(edged, None, iterations=1)
 
-	edged2 = auto_canny(img)
+	edged2 = auto_canny(blurred)
 	edged3 = cv2.dilate(edged2.copy(), None, iterations=1)
 	edged4 = cv2.erode(edged3.copy(), None, iterations=1)
 
 	cv2.imshow("thresh", thresh)
-	cv2.waitKey(10)
-
-	cv2.imshow("thresh2", thresh2)
 	cv2.waitKey(10)
 
 	cv2.imshow("edged4", edged4)
