@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <!--- Run Move Base -->
+  <include file="$(find husky_navigation)/launch/move_base.launch">
+    <arg name="no_static_map" value="true"/>
+  </include>
+  
+  <!-- Navigation -->
+  <node pkg="kuri_mbzirc_challenge_2" type="huskynavigation_action_server.py" name="husky_navigation_server" args="" output="screen"/>
+</launch>

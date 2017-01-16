@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Panel detection -->
+  <include file="$(find kuri_mbzirc_challenge_2_panel_detection)/launch/ar_pose_single_kinect_husky.launch" />
+  <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="circumnavigation_waypoints" name="circumnavigation_waypoints" args="" output="screen"/>
+  <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="panel_waypoint.py" name="panel_waypoint" output="screen"/>
+</launch>
