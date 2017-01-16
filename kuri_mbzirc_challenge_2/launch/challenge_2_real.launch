@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <!--- Run Move Base -->
+  <include file="$(find husky_navigation)/launch/move_base.launch">
+    <arg name="no_static_map" value="true"/>
+  </include>
+
+  <!-- Panel detection -->
+
+  <!-- This runs on the kinect machine -->
+  <!--<include file="$(find kuri_mbzirc_challenge_2_panel_detection)/launch/ar_pose_single_kinect_husky.launch" />-->
+  <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="circumnavigation_waypoints" name="circumnavigation_waypoints" args="" output="screen"/>
+  <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="panel_waypoint.py" name="panel_waypoint" output="screen"/>
+
+
+  <!-- Navigation -->
+  <node pkg="kuri_mbzirc_challenge_2" type="huskynavigation_action_server.py" name="husky_navigation_server" args="" output="screen"/>
+</launch>
