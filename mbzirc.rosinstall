@@ -4,6 +4,9 @@
     local-name: universal_robot
     uri: https://github.com/k-okada/universal_robot.git
     version: bd3df16
+# https://github.com/ros-industrial/universal_robot.git
+# c779432         
+
 # https://github.com/husky/husky/pull/22
 - git:
     local-name: husky

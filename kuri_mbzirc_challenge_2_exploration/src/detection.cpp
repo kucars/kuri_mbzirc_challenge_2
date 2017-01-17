@@ -5,13 +5,13 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include "detection_velo/detection.h"
-#include "detection_velo/panel_searching.h"
-#include "detection_velo/point_types.h"
+#include "kuri_mbzirc_challenge_2_exploration/detection.h"
+#include "kuri_mbzirc_challenge_2_exploration/panel_searching.h"
+#include "kuri_mbzirc_challenge_2_exploration/point_types.h"
 #include <pcl/common/transforms.h>
 #include <pcl/common/common.h>
 //#include <tf/transform_listener.h>
-//#include "detection_velo/transform_listener.h"
+//#include "kuri_mbzirc_challenge_2_exploration/transform_listener.h"
 
 //#include <velodyne_pointcloud/point_types.h>
 //#include <chrono>

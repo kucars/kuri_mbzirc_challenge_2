@@ -13,7 +13,7 @@
 #include <pcl/common/common.h>
 #include <Eigen/Dense>
 #include <pcl/visualization/pcl_visualizer.h>
-#include "detection_velo/panel_searching.h"
+#include "kuri_mbzirc_challenge_2_exploration/panel_searching.h"
 
 
 // Cluster the input pointcloud(raw input)

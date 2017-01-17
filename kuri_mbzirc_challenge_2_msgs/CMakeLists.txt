@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_action_files(
     DIRECTORY action
     FILES
+    BoxPosition.action
     Huskynav.action
     PanelPosition.action
     WrenchDetection.action

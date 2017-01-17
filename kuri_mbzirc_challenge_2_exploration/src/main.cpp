@@ -1,8 +1,8 @@
 #include "ros/ros.h"
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
-#include "detection_velo/detection.h" 
-#include "detection_velo/panel_searching.h"
+#include "kuri_mbzirc_challenge_2_exploration/detection.h"
+#include "kuri_mbzirc_challenge_2_exploration/panel_searching.h"
 #include <tf/transform_listener.h>
 //using namespace velodyne_pointcloud;
 int main(int argc, char **argv)
