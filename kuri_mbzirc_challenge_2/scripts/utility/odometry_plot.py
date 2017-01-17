@@ -27,7 +27,7 @@ args = parser.parse_args()
 
 bag = rosbag.Bag(args.bag)
 
-# Read odometry points
+# Read odometry/filtered points
 odometry_tuples_x = []
 odometry_tuples_y = []
 odometry_tuples_z = []
@@ -36,12 +36,26 @@ for topic, msg, time in bag.read_messages(topics=("/odometry/filtered", "/odomet
         odometry_tuples_y.append(msg.pose.pose.position.y)
         odometry_tuples_z.append(msg.pose.pose.position.z)
 
+# Read odometry/gps points
+gps_tuples_x = []
+gps_tuples_y = []
+gps_tuples_z = []
+for topic, msg, time in bag.read_messages(topics=("/odometry/gps", "/odometry/gps")):
+        gps_tuples_x.append(msg.pose.pose.position.x)
+        gps_tuples_y.append(msg.pose.pose.position.y)
+        gps_tuples_z.append(msg.pose.pose.position.z)
+
 # Plot
-print( "Found " + str(len(odometry_tuples_x)) + " odometry points" )
+print( "Found " + str(len(odometry_tuples_x)) + " points in /odometry/filtered" )
+print( "Found " + str(len(gps_tuples_x)) + " points in /odometry/gps" )
 
 fig = pyplot.figure()
-ax1 = fig.add_subplot(111)
+ax1 = fig.add_subplot(211)
 ax1.scatter(odometry_tuples_x, odometry_tuples_y)
+ax1.set_aspect('equal', adjustable='box')
+ax2 = fig.add_subplot(212)
+ax2.scatter(gps_tuples_x, gps_tuples_y)
+ax2.set_aspect('equal', adjustable='box')
 pyplot.show()
 
 exit(1)
