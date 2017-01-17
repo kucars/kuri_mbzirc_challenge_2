@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- Publish gps tf, otherwise /odometry/gps won't work -->
+  <node pkg="tf" type="static_transform_publisher" name="base_map_broadcaster" args="-0.33 0.25 0.55 0 0 0 /base_link /navsat 100" />
+
   <!--- Run Move Base -->
   <include file="$(find husky_navigation)/launch/move_base.launch">
     <arg name="no_static_map" value="true"/>
