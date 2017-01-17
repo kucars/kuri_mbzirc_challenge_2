@@ -4,7 +4,7 @@
 #include <ros/ros.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
-#include "detection_velo/point_types.h"
+#include "kuri_mbzirc_challenge_2_exploration/point_types.h"
 #include <tf/transform_listener.h>
 
 

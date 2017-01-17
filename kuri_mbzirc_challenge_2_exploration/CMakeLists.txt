@@ -1,14 +1,17 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(detection_velo)
+project(kuri_mbzirc_challenge_2_exploration)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  pcl_ros
   roscpp
   rospy
   roslib
+
+  husky_navigation
+  move_base
+  pcl_ros
   sensor_msgs
   tf
   velodyne_driver
@@ -52,7 +55,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   PATTERN ".svn" EXCLUDE)
 
 
-add_executable(detection src/main.cpp include/${PROJECT_NAME}/detection.cpp include/${PROJECT_NAME}/panel_searching.cpp)
+add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
 target_link_libraries(detection ${catkin_LIBRARIES})
 target_link_libraries(detection ${PCL_LIBRARIES})
 
