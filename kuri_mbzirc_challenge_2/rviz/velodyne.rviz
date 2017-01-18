@@ -8,7 +8,6 @@ Panels:
         - /Status1
         - /Velodyne1
         - /Velodyne1/Autocompute Value Bounds1
-        - /Cluster1
       Splitter Ratio: 0.5
     Tree Height: 556
   - Class: rviz/Selection
@@ -54,8 +53,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 0.384313
-        Min Value: -0.953174
+        Max Value: -0.216297
+        Min Value: -2.02622
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -183,6 +182,14 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+    - Arrow Length: 0.3
+      Class: rviz/PoseArray
+      Color: 255; 25; 0
+      Enabled: true
+      Name: Waypoints
+      Topic: ""
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -207,7 +214,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 131.521
+      Distance: 122.32
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -219,7 +226,7 @@ Visualization Manager:
         Z: -2.41929
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 1.5698
+      Pitch: 1.5648
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
       Yaw: 1.59043

@@ -1,5 +1,9 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- Exploration -->
+  <node pkg="kuri_mbzirc_challenge_2_exploration" type="box_location" name="box_location" args="" output="screen"/>
+
+
   <!-- Panel detection -->
   <include file="$(find kuri_mbzirc_challenge_2_panel_detection)/launch/ar_pose_single_gazebo.launch" />
   <node pkg="kuri_mbzirc_challenge_2_panel_detection" type="circumnavigation_waypoints" name="circumnavigation_waypoints" args="" output="screen"/>

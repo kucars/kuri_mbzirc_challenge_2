@@ -8,7 +8,7 @@ import time
 
 import actionlib
 
-from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction, HuskynavAction
+from kuri_mbzirc_challenge_2_msgs.msg import PanelPositionAction, HuskynavAction, BoxPositionAction
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 # The code is only for state machine overview. To plug in the actual code for each state, please comment out the definition in the code and include the actual code.
@@ -30,93 +30,6 @@ class initialization(smach.State):
         userdata.init_out = userdata.init_params + 1
         time.sleep(sleep_time)
         return 'succeeded'
-
-######
-## EXPLORATION
-######
-
-# define state : panel_searching
-class panel_searching(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['found','not_found'])
-        self.search_time=0
-
-
-    def execute(self, userdata):
-        time.sleep(sleep_time)
-        if self.search_time<2:
-            rospy.loginfo('Target_not_found')
-            self.search_time+=1
-            print 'search result:'
-            print  self.search_time
-            return 'not_found'
-        else:
-            return 'found'
-
-
-
-
-
-# define state : exploration_planning
-class exploration_planning(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['move_to_waypoint'])
-
-
-    def execute(self, userdata):
-        time.sleep(sleep_time)
-        return 'move_to_waypoint'
-
-
-
-# define state : move_base
-class move_base(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['evaluate_terminal_condition'])
-
-
-    def execute(self, userdata):
-        time.sleep(sleep_time)
-        if self.preempt_requested():
-                self.service_preempt()
-                #return 'preempted'
-        else:
-                return 'evaluate_terminal_condition'
-
-# define state : update_map
-class update_map(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['updated','preempted'])
-
-    def execute(self, userdata):
-        time.sleep(sleep_time)
-        if self.preempt_requested():
-            self.service_preempt()
-            return 'preempted'
-        else:
-            return 'updated'
-
-
-# define state : search
-class search(smach.State):
-    def __init__(self):
-        smach.State.__init__(self, outcomes=['succeeded','failed'])
-        self.search_time=0
-    def execute(self, userdata):
-        rospy.loginfo('Executing state SEARCH')
-
-        time.sleep(2*sleep_time)
-        #return 'succeeded'
-
-
-        if self.search_time<2:
-            rospy.loginfo('Target_not_found')
-            self.search_time+=1
-            print 'search result:'
-            print  self.search_time
-            return 'failed'
-        else:
-            return 'succeeded'
 
 
 ######
@@ -220,40 +133,8 @@ class Challenge2():
         self.con_input=100000;
         self.con_output=0;
         # Create a SMACH state machine
-        self.sm = smach.StateMachine(outcomes=['Done'])
+        self.sm = smach.StateMachine(outcomes=['Done', 'aborted'])
         self.sm.userdata.user_input = 0
-
-
-        ## EXPLORATION
-        self.sm_exploration = smach.Concurrence(
-                              outcomes=['succeeded'],
-                              default_outcome='succeeded',
-                              child_termination_cb=self.sm_exploration_con_termination,
-                              outcome_cb=self.concurrence_outcome_cb)
-
-        self.exploring=smach.StateMachine(outcomes=['terminated'])
-        with self.exploring:
-            # Add states to the container
-            smach.StateMachine.add('SEARCHING_PANEL_IN_MAP', panel_searching(),
-                            transitions={'not_found':'EXPLORATION_PLANNING','found':'terminated'})
-            # Add states to the container
-            smach.StateMachine.add('EXPLORATION_PLANNING', exploration_planning(),
-                            transitions={'move_to_waypoint':'MOVE_BASE'})
-            # add the concurrent to the main state machine
-            smach.StateMachine.add('MOVE_BASE', move_base(),
-                            transitions={'evaluate_terminal_condition':'SEARCHING_PANEL_IN_MAP'})
-
-
-
-        self.update_map=smach.StateMachine(outcomes=['preempted'])
-        with self.update_map:
-        # Add states to the container
-            smach.StateMachine.add('UPDATING_MAP', update_map(),
-                            transitions={'updated':'UPDATING_MAP'})
-
-        with self.sm_exploration:
-            smach.Concurrence.add('EXPLORING', self.exploring)
-            smach.Concurrence.add('UPDATING_MAP', self.update_map)
 
 
         ## DETECTION
@@ -315,25 +196,42 @@ class Challenge2():
         with self.sm:
             # Add states to the container
             smach.StateMachine.add('INITIATING', initialization(500000),
-                            transitions={'succeeded':'SEARCHING_PANEL'},
+                            transitions={'succeeded':'EXPLORATION'},
                             remapping={'init_params':'user_input',
                                        'init_out':'start_info'})
-            # add the concurrent to the main state machine
-            smach.StateMachine.add('SEARCHING_PANEL', self.sm_exploration,
-                           transitions={'succeeded':'POSITIONING_IN_FRONT'})
+
+            smach.StateMachine.add('EXPLORATION',
+                            smach_ros.SimpleActionState(
+                                'get_box_cluster', BoxPositionAction,
+                                result_cb = self.get_panel_cluster_result_cb,
+                                output_keys = ['waypoints']
+                            ),
+                            transitions={'succeeded':'MOVE_TO_BOX', 'preempted':'aborted'},
+                            remapping={'waypoints':'box_waypoint'}
+                            )
+
+
+            smach.StateMachine.add('MOVE_TO_BOX',
+                            smach_ros.SimpleActionState(
+                                'husky_navigate', HuskynavAction,
+                                goal_slots=['waypoints']
+                            ),
+                            transitions={'succeeded':'POSITIONING_IN_FRONT', 'preempted':'aborted'},
+                            remapping={'waypoints':'box_waypoint'}
+                            )
 
             smach.StateMachine.add('POSITIONING_IN_FRONT',
-                           self.sm_detection,
-                           transitions={'succeeded':'MOVE_IN_FRONT_PANEL',
-                                        'failed':'SEARCHING_PANEL'}
-                           )
+                            self.sm_detection,
+                            transitions={'succeeded':'MOVE_IN_FRONT_PANEL',
+                                        'failed':'EXPLORATION'}
+                            )
 
             smach.StateMachine.add('MOVE_IN_FRONT_PANEL',
                             smach_ros.SimpleActionState(
                                 'husky_navigate', HuskynavAction,
                                 goal_slots=['waypoints']
                             ),
-                            transitions={'aborted':'POSITIONING_IN_FRONT','succeeded':'DETECTING_VALVE','preempted':'Done'},
+                            transitions={'aborted':'POSITIONING_IN_FRONT','succeeded':'DETECTING_VALVE','preempted':'aborted'},
                             remapping={'waypoints':'panel_waypoint'}
                             )
 
