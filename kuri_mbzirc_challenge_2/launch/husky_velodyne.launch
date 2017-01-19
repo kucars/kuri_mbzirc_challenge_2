@@ -8,7 +8,7 @@
     <!--<arg name="robot_initial_pose" value="$(arg robot_initial_pose)" />-->
     <arg name="random_panel" value="$(arg random_panel)" />
 
-    <arg name="laser_enabled"    value="false"/>
+    <arg name="laser_enabled"    value="true"/>
     <arg name="kinect_enabled"   value="true"/>
     <arg name="velodyne_enabled" value="true"/>
     <arg name="ur5_enabled"      value="false"/>

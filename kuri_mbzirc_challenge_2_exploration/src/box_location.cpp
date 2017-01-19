@@ -29,118 +29,71 @@
 #include <actionlib/server/simple_action_server.h>
 #include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
 
+#include <kuri_mbzirc_challenge_2_exploration/box_location.h>
+
 #include <unistd.h>
 
-const double DEG2RAD = M_PI/180.0;
-const double RAD2DEG = 1/DEG2RAD;
 
 
-typedef kuri_mbzirc_challenge_2_msgs::BoxPositionAction BoxPositionAction;
-typedef kuri_mbzirc_challenge_2_msgs::BoxPositionFeedback BoxPositionFeedback;
-typedef kuri_mbzirc_challenge_2_msgs::BoxPositionResult BoxPositionResult;
-typedef kuri_mbzirc_challenge_2_msgs::BoxPositionGoalConstPtr BoxPositionGoalConstPtr;
-
-
-class BoxPositionActionHandler
+BoxPositionActionHandler::BoxPositionActionHandler(std::string name) :
+  as_(nh_, name, boost::bind(&BoxPositionActionHandler::executeCB, this, _1), false),
+  action_name_(name)
 {
-protected:
+  is_node_enabled = false;
+  as_.start();
+}
 
-  ros::NodeHandle nh_;
-  actionlib::SimpleActionServer<BoxPositionAction> as_; // NodeHandle instance must be created before this line. Otherwise strange error occurs.
-  std::string action_name_;
-  BoxPositionFeedback feedback_;
-  BoxPositionResult result_;
+void BoxPositionActionHandler::executeCB(const BoxPositionGoalConstPtr &goal)
+{
+  is_node_enabled = true;
 
-public:
-  bool is_node_enabled;
+  // Enable callbacks
+  sub_velo  = nh_.subscribe("/velodyne_points", 1, callbackVelo);
+  sub_odom  = nh_.subscribe("/odometry/filtered", 1, callbackOdom);
 
-  BoxPositionActionHandler(std::string name) :
-    as_(nh_, name, boost::bind(&BoxPositionActionHandler::executeCB, this, _1), false),
-    action_name_(name)
+  ros::Rate r(30);
+  while (1)
   {
-    is_node_enabled = false;
-    as_.start();
-  }
-
-  ~BoxPositionActionHandler(void){}
-
-  void executeCB(const BoxPositionGoalConstPtr &goal)
-  {
-    is_node_enabled = true;
-
-    ros::Rate r(30);
-    while (1)
+    // check that preempt has not been requested by the client
+    if (as_.isPreemptRequested() || !ros::ok())
     {
-      // check that preempt has not been requested by the client
-      if (as_.isPreemptRequested() || !ros::ok())
-      {
-        // set the action state to preempted
-        as_.setPreempted();
-        break;
-      }
-
-      if (!is_node_enabled)
-      {
-        // set the action state to succeeded
-        as_.setSucceeded(result_);
-        break;
-      }
-
-      ros::spinOnce();
-      r.sleep();
+      // set the action state to preempted
+      as_.setPreempted();
+      break;
     }
+
+    if (!is_node_enabled)
+    {
+      // set the action state to succeeded
+      as_.setSucceeded(result_);
+      break;
+    }
+
+    ros::spinOnce();
+    r.sleep();
   }
+}
 
-  void setSuccess(geometry_msgs::PoseArray waypoints)
-  {
-    is_node_enabled = false;
+void BoxPositionActionHandler::setSuccess(geometry_msgs::PoseArray waypoints)
+{
+  // Unsubscribe topic handlers
+  sub_velo.shutdown();
+  sub_odom.shutdown();
 
-    result_.success = true;
-    result_.waypoints = waypoints;
-  }
+  // Set return message
+  is_node_enabled = false;
 
-  void setFailure()
-  {
-    is_node_enabled = false;
+  result_.success = true;
+  result_.waypoints = waypoints;
+}
 
-    result_.success = false;
-  }
+void BoxPositionActionHandler::setFailure()
+{
+  is_node_enabled = false;
 
+  result_.success = false;
+}
 
-};
-
-
-typedef velodyne_pointcloud::PointXYZIR VPoint;
-typedef pcl::PointCloud<VPoint> VPointCloud;
-
-// ======
-// Prototypes
-// ======
-void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners);
-void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector);
-
-void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
-std::vector<double> generateRange(double start, double end, double step);
-
-void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
-void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
-
-
-// =====
-// Variables
-// =====
-ros::Subscriber sub_odom;
-ros::Subscriber sub_velo;
-ros::Publisher  pub_wall;
-ros::Publisher  pub_lines;
-ros::Publisher  pub_points;
-ros::Publisher  pub_poses;
-tf::TransformListener *tf_listener;
-
-BoxPositionActionHandler *action_handler;
-bool bypass_action_handler = false;
-std::string actionlib_topic = "get_box_cluster";
-nav_msgs::Odometry current_odom;
 
 int main(int argc, char **argv)
 {
@@ -148,9 +101,6 @@ int main(int argc, char **argv)
   ros::NodeHandle node;
 
   // Topic handlers
-  sub_velo  = node.subscribe("/velodyne_points", 1, callbackVelo);
-  sub_odom  = node.subscribe("/odometry/filtered", 1, callbackOdom);
-
   action_handler = new BoxPositionActionHandler(actionlib_topic);
 
   pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
@@ -277,7 +227,11 @@ void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg)
 void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 {
   if (!action_handler->is_node_enabled && !bypass_action_handler)
+  {
+    sub_velo.shutdown();
     return;
+  }
+
 
   // Convert msg to pointcloud
   pcl::PointCloud<pcl::PointXYZ> cloud;
