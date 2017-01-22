@@ -9,6 +9,7 @@ Created on 10/04/2016
 
 import sys
 import rospy
+import rospkg
 import cv2
 import actionlib
 import math
@@ -41,7 +42,10 @@ topic_name = "wrench_detection"
 clos_kernel_sz = 5;
 
 #===========================================================================================
-img_s = cv2.imread('/home/mbzirc-01/Pictures/wrench_3.PNG')
+rospack = rospkg.RosPack()
+pkg_path = rospack.get_path('kuri_mbzirc_challenge_2_wrench_detection')
+
+img_s = cv2.imread(pkg_path + '/images/wrench_3.PNG')
 out_s = img_s.copy()
 
 #cv2.imshow("img_s", img_s)
