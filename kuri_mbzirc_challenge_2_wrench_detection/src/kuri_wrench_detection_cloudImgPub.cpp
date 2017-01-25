@@ -1,6 +1,7 @@
 /***************************************************************************
  *   Copyright (C) 2016 - 2017 by                                          *
  *      Tarek Taha, KURI  <tataha@tarektaha.com>                           *
+ *      Husameldin Mukhtar, VSAP  <husameldin@gmail.com>                           *
  *                                                                         *
  *                                                                         *
  *   This program is free software; you can redistribute it and/or modify  *
@@ -20,6 +21,7 @@
  ***************************************************************************/
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Image.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
@@ -35,7 +37,8 @@
 
 ros::Publisher planePub;
 ros::Publisher wrenchPub;
-typedef pcl::PointCloud<pcl::PointXYZ> PointCloud;
+ros::Publisher wrench_img_Pub;
+typedef pcl::PointCloud<pcl::PointXYZRGB> PointCloud;
 
 void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
 {
@@ -46,6 +49,7 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
   pcl_conversions::toPCL(*input, *cloud);
  
   // Convert to ROS data type
+  sensor_msgs::Image wrenchOutputImg; 
   sensor_msgs::PointCloud2 planeOutput,wrenchOutput;
   pcl_conversions::fromPCL(cloud_filtered, planeOutput);
   //planeOutput = *input;
@@ -56,13 +60,13 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
   pcl::PCLPointCloud2 pcl_pc2;
   pcl_conversions::toPCL(*input,pcl_pc2);
     
-  pcl::PointCloud<pcl::PointXYZ>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr inputCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
   pcl::fromPCLPointCloud2(pcl_pc2,*inputCloud);
     
   pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients);
   pcl::PointIndices::Ptr inliers (new pcl::PointIndices);
   // Create the segmentation object
-  pcl::SACSegmentation<pcl::PointXYZ> seg;
+  pcl::SACSegmentation<pcl::PointXYZRGB> seg;
    // Optional
   seg.setOptimizeCoefficients (true);
   // Mandatory
@@ -73,7 +77,7 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
   seg.segment (*inliers, *coefficients);
 
   // Create the filtering object
-  pcl::ExtractIndices<pcl::PointXYZ> extract;
+  pcl::ExtractIndices<pcl::PointXYZRGB> extract;
   PointCloud::Ptr planePoints(new PointCloud);
   PointCloud::Ptr wrenchPoints(new PointCloud);
 
@@ -88,27 +92,31 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
     // Extract the inliers
     extract.setInputCloud (inputCloud);
     extract.setIndices (inliers);
+    extract.setKeepOrganized (true); 	
     extract.setNegative (false);
     extract.filter (*planePoints);
     std::cerr << "PointCloud representing the planar component: " << planePoints->width * planePoints->height << " data points." << std::endl;
 
     pcl::toROSMsg(*planePoints, planeOutput);
-    planeOutput.header.frame_id = "camera_rgb_optical_frame";
-    planeOutput.header.stamp = ros::Time::now();
+    //planeOutput.header.frame_id = "camera_rgb_optical_frame";
+    //planeOutput.header.stamp = ros::Time::now();
 
     planePub.publish(planeOutput);
     // Extract the outliers
     extract.setInputCloud (inputCloud);
     extract.setIndices (inliers);
+    extract.setKeepOrganized (true); 
     extract.setNegative (true);
     extract.filter (*wrenchPoints);
     std::cerr << "PointCloud representing the wrench component: " << wrenchPoints->width * wrenchPoints->height << " data points." << std::endl;
 
     pcl::toROSMsg(*wrenchPoints, wrenchOutput);
-    planeOutput.header.frame_id = "camera_rgb_optical_frame";
-    planeOutput.header.stamp = ros::Time::now();
+    pcl::toROSMsg(*wrenchPoints, wrenchOutputImg);
+    //planeOutput.header.frame_id = "camera_rgb_optical_frame";
+    //planeOutput.header.stamp = ros::Time::now();
 
     wrenchPub.publish(wrenchOutput);
+    wrench_img_Pub.publish(wrenchOutputImg);
     /*
     for (size_t i = 0; i < inliers->indices.size (); ++i)
     {
@@ -133,6 +141,7 @@ int main (int argc, char** argv)
   ros::Subscriber sub = nh.subscribe ("/camera/depth/points", 1, cloud_cb);
   planePub      = nh.advertise<sensor_msgs::PointCloud2>("/plane_points", 1);
   wrenchPub     = nh.advertise<sensor_msgs::PointCloud2>("/wrench_points", 1);
+  wrench_img_Pub     = nh.advertise<sensor_msgs::Image>("/wrench_image", 30);
 
   // Spin
   ros::spin ();

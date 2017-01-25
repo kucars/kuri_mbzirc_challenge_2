@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+
+<launch>
+
+  <include file="$(find kinect2_bridge)/launch/kinect2_bridge.launch">
+  </include>
+
+  <node name="wrench_detection" pkg="kuri_mbzirc_challenge_2_wrench_detection" type="wrench_detection_kinect2_pose.py" output="screen"/>
+
+
+</launch>
