@@ -32,6 +32,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
+#include <boost/foreach.hpp>
 
 ros::Publisher planePub;
 ros::Publisher wrenchPub;
@@ -96,6 +97,13 @@ void cloud_cb(const sensor_msgs::PointCloud2ConstPtr& input)
     planeOutput.header.frame_id = "camera_rgb_optical_frame";
     planeOutput.header.stamp = ros::Time::now();
 
+    //std::cerr << "depth: "<< planeOutput->fields << std::endl;
+    //ROS_INFO(planeOutput.z())
+
+    printf ("Cloud: width = %d, height = %d\n", planePoints->width, planePoints->height);
+    BOOST_FOREACH (const pcl::PointXYZ& pt, planePoints->points)
+    printf ("\t(%f, %f, %f)\n", pt.x, pt.y, pt.z);
+
     planePub.publish(planeOutput);
     // Extract the outliers
     extract.setInputCloud (inputCloud);
@@ -130,7 +138,7 @@ int main (int argc, char** argv)
   std::string topic = nh.resolveName("point_cloud");;
   // Create a ROS subscriber for the input point cloud
   // ros::Subscriber sub = nh.subscribe ("/camera/depth_registered/points", 1, cloud_cb);
-  ros::Subscriber sub = nh.subscribe ("/camera/depth/points", 1, cloud_cb);
+  ros::Subscriber sub = nh.subscribe ("/kinect2/qhd/points", 1, cloud_cb);
   planePub      = nh.advertise<sensor_msgs::PointCloud2>("/plane_points", 1);
   wrenchPub     = nh.advertise<sensor_msgs::PointCloud2>("/wrench_points", 1);
 
