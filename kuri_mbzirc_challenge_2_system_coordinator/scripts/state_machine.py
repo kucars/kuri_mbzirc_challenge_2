@@ -5,6 +5,7 @@ import rospy
 import smach
 import smach_ros
 import time
+import sys
 
 import actionlib
 
@@ -19,17 +20,33 @@ sleep_time = 0.3
 
 # define state : initialization
 class initialization(smach.State):
-    def __init__(self,test_num):
-        smach.State.__init__(self, outcomes=['succeeded'],
-                             input_keys=['init_params'],
-                             output_keys=['init_out'])
-        self.test_num=test_num
+    def __init__(self, starting_mode):
+        smach.State.__init__(self, outcomes=['full',
+                                            'skip_to_panel_positioning',
+                                            'skip_to_wrench_detection'],
+                             )
+        self.starting_mode = starting_mode
+
     def execute(self, userdata):
-        print self.test_num
-        rospy.loginfo('Executing state INITIALIZATION')
-        userdata.init_out = userdata.init_params + 1
-        time.sleep(sleep_time)
-        return 'succeeded'
+        if (self.starting_mode == '1' or self.starting_mode == "default"):
+            return 'full'
+
+        elif (self.starting_mode == '2' or self.starting_mode == "panel_positioning"):
+            return 'skip_to_panel_positioning'
+
+        elif (self.starting_mode == '3' or self.starting_mode == 'wrench_detection'):
+            return 'skip_to_wrench_detection'
+
+        else:
+            print('Running "default" mode.')
+            print("To skip to a specific state, use the following arguments: \n" \
+                  "  1 - default            :  Runs the full state machine \n" \
+                  "  2 - panel_positioning  :  Skips exploration and attempts to position in front of panel \n" \
+                  "  3 - wrench_detection   :  Skips positioning and attempts to detect wrench \n"
+                  )
+
+
+            return 'full'
 
 
 ######
@@ -128,21 +145,15 @@ class operate_valve(smach.State):
 
 # main
 class Challenge2():
-    def __init__(self):
-        # Initialize a number of parameters and variables
-        self.con_input=100000;
-        self.con_output=0;
+    def __init__(self, starting_mode):
         # Create a SMACH state machine
         self.sm = smach.StateMachine(outcomes=['Done', 'aborted'])
-        self.sm.userdata.user_input = 0
-
 
         ## DETECTION
         self.sm_detection = smach.Concurrence(
                               outcomes=['succeeded', 'failed'],
                               default_outcome='succeeded',
                               child_termination_cb=self.sm_detection_con_termination,
-                              #outcome_cb=self.concurrence_outcome_cb
                               )
 
         self.circumnavigating=smach.StateMachine(outcomes=['terminated', 'failed', 'preempted'])
@@ -195,10 +206,12 @@ class Challenge2():
         # Open the container
         with self.sm:
             # Add states to the container
-            smach.StateMachine.add('INITIATING', initialization(500000),
-                            transitions={'succeeded':'EXPLORATION'},
-                            remapping={'init_params':'user_input',
-                                       'init_out':'start_info'})
+            smach.StateMachine.add('INITIATING', initialization(starting_mode),
+                            transitions={'full':'EXPLORATION',
+                                         'skip_to_panel_positioning':'POSITIONING_IN_FRONT',
+                                         'skip_to_wrench_detection':'DETECTING_VALVE'
+                                        }
+                            )
 
             smach.StateMachine.add('EXPLORATION',
                             smach_ros.SimpleActionState(
@@ -263,7 +276,6 @@ class Challenge2():
 
         # Execute SMACH plan
         outcome = self.sm.execute()
-        print self.con_output
         rospy.spin()
         sis.stop()
 
@@ -278,20 +290,6 @@ class Challenge2():
             return True
         else:
             return False
-
-    # Gets called when ALL child states are terminated
-    def concurrence_outcome_cb(self, outcome_map):
-        print 'concurrent_terminated'
-        print self.con_input
-        print self.con_output
-        self.con_output=self.con_input+1
-        print self.con_output
-
-
-        rospy.loginfo('Existing state CON')
-        time.sleep(sleep_time)
-        return 'succeeded'
-
 
 
 
@@ -346,4 +344,8 @@ class Challenge2():
 
 if __name__ == '__main__':
     rospy.init_node('MBZIRC_ch2_state_machine')
-    Challenge2()
+
+    if len(sys.argv) < 2:
+        Challenge2(-1)
+    else:
+        Challenge2(sys.argv[1])
