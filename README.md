@@ -1,5 +1,7 @@
 # MBZIRC Challenge 2
 
+[![Build Status](https://travis-ci.org/kuri-kustar/kuri_mbzirc_challenge_2.svg?branch=master)](https://travis-ci.org/kuri-kustar/kuri_mbzirc_challenge_2)
+
 This package is developed based on the jsk simulation environemnt http://github.com/start-jsk/jsk_mbzirc
 
 ## Installing
