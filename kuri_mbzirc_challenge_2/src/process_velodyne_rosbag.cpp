@@ -130,7 +130,7 @@ struct tracked_cluster
   pcl::PointCloud<pcl::PointXYZI>::Ptr cloud;
   double x, y;
   double x_start, y_start;
-  double distance_travelled;
+  double distance, distance_travelled;
 };
 
 
@@ -167,12 +167,12 @@ int main(int argc, char **argv)
 
 
   // Process velodyne messages
-  double max_angle = DEG2RAD(0);
-  double min_angle = DEG2RAD(-10);
-  double max_starting_distance = 80.0;
-  double min_starting_distance = 60.0;
+  double max_angle = DEG2RAD(15);
+  double min_angle = DEG2RAD(0);
+  double max_starting_distance = 70;
+  double min_starting_distance = 60;
   double tracked_distance = -1;
-  double tracking_radius = 2;
+  double tracking_radius = 5;
   bool is_tracking = false;
 
   std::vector<tracked_cluster> tracked;
@@ -258,6 +258,17 @@ int main(int argc, char **argv)
         continue;
 
 
+      if (!is_tracking)
+      {
+        double x = centroid_list[pci][0];
+        double y = centroid_list[pci][1];
+        double r = sqrt(x*x + y*y);
+
+        if (r < min_starting_distance || r > max_starting_distance)
+          continue;
+      }
+
+
       bool found = false;
 
       // Update previous tracked entries
@@ -293,6 +304,7 @@ int main(int argc, char **argv)
         x1 = tracked[ti].x - tracked[ti].x_start;
         y1 = tracked[ti].y - tracked[ti].y_start;
         tracked[ti].distance_travelled = sqrt(x1*x1 + y1*y1);
+        tracked[ti].distance = dist2;
 
         // Write to file
         if (is_tracking)
@@ -337,7 +349,7 @@ int main(int argc, char **argv)
         tracked_temp.push_back(tracked[ti]);
 
         is_tracking = true;
-        tracking_radius = 4;
+        tracking_radius = 5;
         break;
       }
 
