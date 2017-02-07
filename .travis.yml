@@ -18,7 +18,7 @@ notifications:
 env:
   global:
     # Some Global variables can go here
-    - GLOBAL_VAR="global_var"
+    #- GLOBAL_VAR="global_var"
   matrix:
     - ROS_DISTRO="indigo" ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
     #- ROS_DISTRO="jade"   ROS_REPOSITORY_PATH=http://packages.ros.org/ros/ubuntu
@@ -65,6 +65,19 @@ script:
 - catkin_make
 - source devel/setup.bash
 - rospack profile
+
 - catkin_make
 - source devel/setup.bash
 - rospack profile
+
+- catkin_make
+- source devel/setup.bash
+- rospack profile
+
+- catkin_make
+- source devel/setup.bash
+- rospack profile
+
+- catkin_make
+- catkin_make
+- catkin_make
