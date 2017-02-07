@@ -19,7 +19,6 @@ from sensor_msgs.msg import Image
 from sensor_msgs.msg import Image, RegionOfInterest
 from sensor_msgs.msg import CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
-from kuri_mbzirc_challenge_2_msgs.msg import PanelDetectionAction
 from scipy.spatial import distance
 from collections import OrderedDict
 import numpy as np
@@ -36,8 +35,7 @@ import glob
 from os.path import expanduser
 home = expanduser("~")
 
-node_name = "panel_detection_server"
-topic_name = "panel_detection"
+node_name = "panel_detection_node"
 
 clos_kernel_sz = 5;
 
@@ -70,7 +68,7 @@ def auto_canny(image, sigma=0.33):
     # return the edged image
     return edged
 
-class PanelDetectionServer:
+class PanelDetection:
 
     def __init__(self, is_bypass):
         self.is_bypass = is_bypass
@@ -126,10 +124,6 @@ class PanelDetectionServer:
 
         self.tool_pos = PoseStamped()
         self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1)
-
-        # Start actionlib server
-        self.server = actionlib.SimpleActionServer(topic_name, PanelDetectionAction, self.execute, False)
-        self.server.start()
 
         rospy.loginfo("Started panel detection node. Currently on standby")
 
@@ -451,14 +445,6 @@ class PanelDetectionServer:
                 cv2.line(output, (WW/2,0), (WW/2,HH), (0, 0, 255), 1)
                 cv2.line(output, (0,HH/2), (WW,HH/2), (0, 0, 255), 1)
 
-                #result = PanelDetectionResult()
-
-                #result.ROI = [pnl_x, pnl_y, pnl_w, pnl_h]
-                #self.server.set_succeeded(result)
-
-                # Disable the node since it found its target
-                #self.is_node_enabled = False
-
                 for wr in wrenches:
                     (tool_px, tool_py, tool_pw, tool_ph) = cv2.boundingRect(wr)
 
@@ -546,27 +532,9 @@ class PanelDetectionServer:
 
             #self.tool_pos_pub.publish(self.tool_pos)
 
-
-
         # show the output image
         cv2.imshow("out2", output)
         cv2.waitKey(3)
-
-
-        # If the panel is detected, return the region of interest
-        #p1 = Point(0 ,0 ,0)
-        #p2 = Point(10,0 ,0)
-        #p3 = Point(10,10,0)
-        #p4 = Point(0 ,10,0)
-
-        #rospy.loginfo("Found panel")
-        #result = PanelDetectionResult()
-
-        #result.ROI = [p1, p2, p3, p4]
-        #self.server.set_succeeded(result)
-
-        # Disable the node since it found its target
-        #self.disableNode()
 
 
 if __name__ == '__main__':
@@ -578,5 +546,5 @@ if __name__ == '__main__':
             is_bypass = True
             break
 
-      server = PanelDetectionServer(is_bypass)
+      PanelDetection(is_bypass)
       rospy.spin()
