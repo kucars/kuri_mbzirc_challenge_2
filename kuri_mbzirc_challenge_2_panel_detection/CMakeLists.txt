@@ -33,4 +33,5 @@ link_directories(${PCL_LIBRARY_DIRS})
 
 add_executable(circumnavigation_waypoints src/circumnavigation_waypoints.cpp)
 target_link_libraries(circumnavigation_waypoints ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(circumnavigation_waypoints ${catkin_EXPORTED_TARGETS})
 

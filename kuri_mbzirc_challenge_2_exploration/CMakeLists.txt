@@ -52,6 +52,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 
 add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
 target_link_libraries(detection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(detection ${catkin_EXPORTED_TARGETS})
 
 add_executable(box_location src/box_location.cpp)
 target_link_libraries(box_location ${catkin_LIBRARIES} ${PCL_LIBRARIES})

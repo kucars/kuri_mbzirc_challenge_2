@@ -28,9 +28,11 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(kuri_wrench_detection src/kuri_wrench_detection.cpp)
 target_link_libraries(kuri_wrench_detection ${catkin_LIBRARIES})
+add_dependencies(kuri_wrench_detection ${catkin_EXPORTED_TARGETS})
 
 add_executable(kuri_wrench_detection_cloudImgPub src/kuri_wrench_detection_cloudImgPub.cpp)
 target_link_libraries(kuri_wrench_detection_cloudImgPub ${catkin_LIBRARIES})
+add_dependencies(kuri_wrench_detection_cloudImgPub ${catkin_EXPORTED_TARGETS})
 
 #############
 ## Install ##
