@@ -54,7 +54,7 @@ install:
   - wstool set -t src -y kuri_mbzirc_challenge_2 https://github.com/kuri-kustar/kuri_mbzirc_challenge_2.git --git
   - wstool merge -t src https://raw.githubusercontent.com/kuri-kustar/kuri_mbzirc_challenge_2/master/mbzirc.rosinstall
   - wstool update -t src
-  - rosdep install -y -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO
+  #- rosdep install -y -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO
 
 # Use this to prepare your build for testing e.g. copy database configurations, environment variables, etc.
 before_script:
