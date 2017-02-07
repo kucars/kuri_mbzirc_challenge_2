@@ -4,6 +4,7 @@ project(kuri_mbzirc_challenge_2_wrench_detection)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
+  kuri_mbzirc_challenge_2_msgs
   pcl_conversions
   pcl_ros
   roscpp

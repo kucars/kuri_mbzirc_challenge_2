@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
 
   #husky_navigation
   #move_base
+  kuri_mbzirc_challenge_2_msgs
   pcl_ros
   pcl_conversions
   sensor_msgs

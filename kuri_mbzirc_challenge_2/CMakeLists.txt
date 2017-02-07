@@ -6,6 +6,8 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     rosbag
 
+    kuri_mbzirc_challenge_2_msgs
+
     pcl_conversions
     #pcl_ros
 )

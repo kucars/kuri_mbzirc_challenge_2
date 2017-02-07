@@ -4,6 +4,7 @@ project(kuri_mbzirc_challenge_2_panel_detection)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
   #eigen_conversions
+  kuri_mbzirc_challenge_2_msgs
   pcl_ros
   pcl_conversions
   roscpp

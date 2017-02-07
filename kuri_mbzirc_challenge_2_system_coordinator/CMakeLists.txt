@@ -7,6 +7,7 @@ project(kuri_mbzirc_challenge_2_system_coordinator)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  kuri_mbzirc_challenge_2_msgs
   std_msgs
 )
 
