@@ -41,6 +41,8 @@ before_install:
   - sudo apt-get install -y libcgal-dev
   - sudo rosdep init
   - rosdep update
+  - sudo apt-get install -y python-pip #python-numpy python-scipy python-matplotlib ipython ipython-notebook python-pandas python-sympy python-nose
+  - sudo pip install imutils
   # Install Firmware-needed libraries:
   #- sudo apt-get install python-argparse git-core wget zip python-empy qtcreator cmake build-essential genromfs -y
   #- sudo apt-get install ant protobuf-compiler libeigen3-dev libopencv-dev clang-3.5 lldb-3.5 -y
