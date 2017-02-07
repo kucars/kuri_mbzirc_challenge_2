@@ -6,6 +6,7 @@ import smach
 import smach_ros
 import time
 import sys
+import threading, signal
 
 import actionlib
 
@@ -14,14 +15,16 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
 # The code is only for state machine overview. To plug in the actual code for each state, please comment out the definition in the code and include the actual code.
 
-# Orson Lin 10.09.2016
+# v1 - Orson Lin            2016-09-10
+# v2 - Abdullah Abduldayem  2017-02-07
+
 sleep_time = 0.3
 
 
 # define state : initialization
 class initialization(smach.State):
     def __init__(self, starting_mode):
-        smach.State.__init__(self, outcomes=['full',
+        smach.State.__init__(self, outcomes=['execute_all_states',
                                             'skip_to_panel_positioning',
                                             'skip_to_wrench_detection'],
                              )
@@ -29,7 +32,7 @@ class initialization(smach.State):
 
     def execute(self, userdata):
         if (self.starting_mode == '1' or self.starting_mode == "default"):
-            return 'full'
+            return 'execute_all_states'
 
         elif (self.starting_mode == '2' or self.starting_mode == "panel_positioning"):
             return 'skip_to_panel_positioning'
@@ -40,13 +43,13 @@ class initialization(smach.State):
         else:
             print('Running "default" mode.')
             print("To skip to a specific state, use the following arguments: \n" \
-                  "  1 - default            :  Runs the full state machine \n" \
+                  "  1 - default            :  Runs the complete state machine \n" \
                   "  2 - panel_positioning  :  Skips exploration and attempts to position in front of panel \n" \
                   "  3 - wrench_detection   :  Skips positioning and attempts to detect wrench \n"
                   )
 
 
-            return 'full'
+            return 'execute_all_states'
 
 
 ######
@@ -144,8 +147,10 @@ class operate_valve(smach.State):
 
 
 # main
-class Challenge2():
+class Challenge2(threading.Thread):
     def __init__(self, starting_mode):
+        threading.Thread.__init__(self)
+
         # Create a SMACH state machine
         self.sm = smach.StateMachine(outcomes=['Done', 'aborted'])
 
@@ -182,7 +187,7 @@ class Challenge2():
                             )
 
 
-        self.detect_panel=smach.StateMachine(outcomes=['terminated', 'failed', 'preempted'],
+        self.detect_panel=smach.StateMachine(outcomes=['terminated', 'aborted', 'preempted'],
                                              output_keys=['panel_waypoint'])
         with self.detect_panel:
             # Add states to the container
@@ -192,7 +197,7 @@ class Challenge2():
                                 result_cb = self.detecting_panel_result_cb,
                                 output_keys = ['waypoints']
                             ),
-                            transitions={'aborted':'DETECTING_PANEL',
+                            transitions={'aborted':'aborted',
                                          'succeeded':'terminated',
                                          'preempted': 'preempted'},
                             remapping={'waypoints':'panel_waypoint'}
@@ -207,7 +212,7 @@ class Challenge2():
         with self.sm:
             # Add states to the container
             smach.StateMachine.add('INITIATING', initialization(starting_mode),
-                            transitions={'full':'EXPLORATION',
+                            transitions={'execute_all_states':'EXPLORATION',
                                          'skip_to_panel_positioning':'POSITIONING_IN_FRONT',
                                          'skip_to_wrench_detection':'DETECTING_VALVE'
                                         }
@@ -217,7 +222,9 @@ class Challenge2():
                             smach_ros.SimpleActionState(
                                 'get_box_cluster', BoxPositionAction,
                                 result_cb = self.get_panel_cluster_result_cb,
-                                output_keys = ['waypoints']
+                                output_keys = ['waypoints'],
+                                server_wait_timeout = rospy.Duration(1.0),
+                                exec_timeout = rospy.Duration(1.0),
                             ),
                             transitions={'succeeded':'MOVE_TO_BOX', 'preempted':'aborted'},
                             remapping={'waypoints':'box_waypoint'}
@@ -271,6 +278,7 @@ class Challenge2():
                            remapping={'operate_valve_in':'valve_pose'})
 
 
+    def run ( self ):
         sis = smach_ros.IntrospectionServer('server_name', self.sm, '/SM_ROOT')
         sis.start()
 
@@ -298,7 +306,7 @@ class Challenge2():
     def sm_detection_con_termination(self, outcome_map):
         # If the current navigation task has succeeded, return True
         print 'Detection termination'
-        if outcome_map['DETECTING_PANEL'] == 'terminated':
+        if (outcome_map['DETECTING_PANEL'] == 'terminated' or outcome_map['DETECTING_PANEL'] == 'aborted'):
             print 'preempt all the rest'
             return True
         else:
@@ -345,7 +353,14 @@ class Challenge2():
 if __name__ == '__main__':
     rospy.init_node('MBZIRC_ch2_state_machine')
 
-    if len(sys.argv) < 2:
-        Challenge2(-1)
-    else:
-        Challenge2(sys.argv[1])
+    init_val =1
+
+    if len(sys.argv) >= 2:
+        init_val = sys.argv[1]
+
+    try:
+        thread = Challenge2(init_val)
+        thread.start()
+        signal.pause() #Pause the main thread until we recieve an interrupt
+    except (KeyboardInterrupt, SystemExit):
+        sys.exit()
