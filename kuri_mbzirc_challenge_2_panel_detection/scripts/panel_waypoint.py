@@ -16,7 +16,7 @@ import sys, os
 
 import actionlib
 
-from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion, PoseWithCovariance, Twist, Point, Pose, PoseArray
+from geometry_msgs.msg import PoseWithCovarianceStamped, Quaternion, PoseWithCovariance, Twist, Point, Pose, PoseArray, PoseStamped
 from nav_msgs.msg import Odometry
 from visualization_msgs.msg import Marker
 from tf.transformations import quaternion_from_euler, euler_from_quaternion
@@ -42,7 +42,6 @@ class mbzirc_panel_track():
         ############
         ## Set up topic handlers
         ############
-        self.marker_sub = rospy.Subscriber('/visualization_marker', Marker, self.arCallback, queue_size=5)
         #self.pose_sub   = rospy.Subscriber("/odometry/filtered", Odometry, self.poseCallback)
 
         # Start actionlib server
@@ -54,7 +53,7 @@ class mbzirc_panel_track():
 
     def execute(self, goal_msg):
         # This node was called, perform any necessary changes here
-        self.is_node_enabled = True
+        self.enableNode()
         rospy.loginfo("panel_waypoint node enabled")
 
         # Wait until we've detected the panel
@@ -71,6 +70,13 @@ class mbzirc_panel_track():
 
         self.server.set_succeeded(self.result_)
 
+    def enableNode(self):
+        self.is_node_enabled = True
+        self.marker_sub = rospy.Subscriber('/ch2/detection/panel/center_pose', PoseStamped, self.panelCallback, queue_size=5)
+
+    def disableNode(self):
+        self.is_node_enabled = False
+        self.marker_sub.unregister()
 
     def poseCallback(self, data):
         x = data.pose.pose.position.x
@@ -89,7 +95,7 @@ class mbzirc_panel_track():
             rospy.loginfo("Current Location x: " + str(round(x,3)) + "\ty: " + str(round(y,3)) + "\tz: " + str(round(z,3)) + "\tyaw: " + str(round(degrees(yaw), 1)))
 
 
-    def arCallback(self, data):
+    def panelCallback(self, data):
         ## Sensor Coordinate frame: x = right, y = down, z = front
         ## Nav Coordinate frame:    x = front, y = left, z = up
 
@@ -126,7 +132,7 @@ class mbzirc_panel_track():
         self.result_.waypoints = goal
 
         # Disable the node since it found its target
-        self.is_node_enabled = False
+        self.disableNode()
 
 
     def generateRelativePositionGoal(self, pose):

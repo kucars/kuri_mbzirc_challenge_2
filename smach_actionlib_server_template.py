@@ -9,6 +9,7 @@ Created on 10/04/2016
 import rospy
 import actionlib
 import math
+import sys
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from geometry_msgs.msg import Point
 from sensor_msgs.msg import Image
@@ -19,8 +20,12 @@ topic_name = "wrench_detection"
 
 class WrenchDetectionServer:
 
-    def __init__(self):
+    def __init__(self, is_bypass):
+        self.is_bypass = is_bypass
+
         self.is_node_enabled = False
+        if (self.is_bypass):
+            self.is_node_enabled = True
 
         # Set up callbacks
         self.camera_sub = rospy.Subscriber('/camera', Image, self.camera_callback, queue_size=20)
@@ -63,11 +68,17 @@ class WrenchDetectionServer:
         self.server.set_succeeded(result)
 
         # Disable the node since it found its target
-        self.is_node_enabled = False
+        if (not self.is_bypass):
+            self.is_node_enabled = False
 
 
 
 if __name__ == '__main__':
       rospy.init_node(node_name)
-      server = WrenchDetectionServer()
+
+      is_bypass = False
+      if len(sys.argv) >= 2:
+          is_bypass = True
+
+      server = WrenchDetectionServer(is_bypass)
       rospy.spin()

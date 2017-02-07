@@ -19,7 +19,7 @@ from sensor_msgs.msg import Image
 from sensor_msgs.msg import Image, RegionOfInterest
 from sensor_msgs.msg import CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
-from kuri_mbzirc_challenge_2_msgs.msg import WrenchDetectionAction
+from kuri_mbzirc_challenge_2_msgs.msg import PanelDetectionAction
 from scipy.spatial import distance
 from collections import OrderedDict
 import numpy as np
@@ -72,16 +72,36 @@ def auto_canny(image, sigma=0.33):
 
 class PanelDetectionServer:
 
-    def __init__(self):
-        self.is_node_enabled = True
+    def __init__(self, is_bypass):
+        self.is_bypass = is_bypass
+
+        self.is_node_enabled = False
+        if (self.is_bypass):
+            print("Bypassing: " + node_name + " node enabled")
+            self.enableNode()
+
+        self.tool_size = '18mm'
+        sizes = OrderedDict({
+            "13mm": (2.8, 16.8),
+            "14mm": (3, 17.9),
+            "16mm": (3.4, 20.9),
+            "17mm": (3.6, 21.2),
+            "18mm": (3.8, 22),
+            "19mm": (4, 23.2)})
+
+        self.lab = np.zeros((len(sizes), 1, 2))
+        self.toolSizes = []
+
+        # loop over the dictionary
+        for (i, (name, size)) in enumerate(sizes.items()):
+            self.lab[i] = size
+            self.toolSizes.append(name)
 
         # Set up callbacks
         self.bridge = CvBridge()
-        self.camera_sub = rospy.Subscriber('/kinect2/qhd/image_color', Image, self.camera_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
 
         self.image_width = 1
         self.image_height = 1
-        self.cameraInfo_sub = rospy.Subscriber("/kinect2/qhd/camera_info",CameraInfo,self.get_camera_info, queue_size = 1)
 
         self.panel_ROI = RegionOfInterest()
         self.panel_ROI_pub = rospy.Publisher("/ch2/detection/panel/bb_pixel", RegionOfInterest, queue_size = 1)
@@ -108,29 +128,44 @@ class PanelDetectionServer:
         self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1)
 
         # Start actionlib server
-        #self.server = actionlib.SimpleActionServer(topic_name, PanelDetectionAction, self.execute, False)
-        #self.server.start()
+        self.server = actionlib.SimpleActionServer(topic_name, PanelDetectionAction, self.execute, False)
+        self.server.start()
 
         rospy.loginfo("Started panel detection node. Currently on standby")
 
-        self.tool_size = '18mm'
+        while (not rospy.is_shutdown()):
+            subs = self.getNumOfSubscribers()
+            if (subs > 0 and not self.is_node_enabled):
+                self.enableNode()
 
+            elif (subs == 0 and self.is_node_enabled and not self.is_bypass):
+                self.disableNode()
 
-        sizes = OrderedDict({
-            "13mm": (2.8, 16.8),
-            "14mm": (3, 17.9),
-            "16mm": (3.4, 20.9),
-            "17mm": (3.6, 21.2),
-            "18mm": (3.8, 22),
-            "19mm": (4, 23.2)})
+            time.sleep(0.05) # delays for 50ms
 
-        self.lab = np.zeros((len(sizes), 1, 2))
-        self.toolSizes = []
+    def getNumOfSubscribers(self):
+        s = self.panel_ROI_pub.get_num_connections() + \
+            self.wrenches_ROI_pub.get_num_connections() + \
+            self.valve_ROI_pub.get_num_connections() + \
+            self.tool_ROI_pub.get_num_connections() + \
+            self.panel_pos_pub.get_num_connections() + \
+            self.wrenches_pos_pub.get_num_connections() + \
+            self.valve_pos_pub.get_num_connections() + \
+            self.tool_pos_pub.get_num_connections()
 
-        # loop over the dictionary
-        for (i, (name, size)) in enumerate(sizes.items()):
-            self.lab[i] = size
-            self.toolSizes.append(name)
+        return s
+
+    def enableNode(self):
+        print("Enabled node " + node_name)
+        self.is_node_enabled = True
+        self.camera_sub = rospy.Subscriber('/kinect2/qhd/image_color', Image, self.camera_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
+        self.cameraInfo_sub = rospy.Subscriber("/kinect2/qhd/camera_info",CameraInfo,self.get_camera_info, queue_size = 1)
+
+    def disableNode(self):
+        print("Disabled node " + node_name)
+        self.is_node_enabled = False
+        self.camera_sub.unregister()
+        self.cameraInfo_sub.unregister()
 
     def get_camera_info(self, msg):
         self.image_width = msg.width
@@ -154,10 +189,9 @@ class PanelDetectionServer:
         # return the size label with the smallest distance
         return self.toolSizes[minDist[1]]
 
-
     def execute(self, goal_msg):
         # This node was called, perform any necessary changes here
-        self.is_node_enabled = True
+        self.enableNode()
         rospy.loginfo("Panel detection node enabled")
 
 
@@ -532,10 +566,17 @@ class PanelDetectionServer:
         #self.server.set_succeeded(result)
 
         # Disable the node since it found its target
-        #self.is_node_enabled = False
+        #self.disableNode()
 
 
 if __name__ == '__main__':
       rospy.init_node(node_name)
-      server = PanelDetectionServer()
+
+      is_bypass = False
+      for i in range(0,len(sys.argv)):
+          if sys.argv[1] == "-e":
+            is_bypass = True
+            break
+
+      server = PanelDetectionServer(is_bypass)
       rospy.spin()

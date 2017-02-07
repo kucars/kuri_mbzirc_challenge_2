@@ -223,8 +223,6 @@ class Challenge2(threading.Thread):
                                 'get_box_cluster', BoxPositionAction,
                                 result_cb = self.get_panel_cluster_result_cb,
                                 output_keys = ['waypoints'],
-                                server_wait_timeout = rospy.Duration(1.0),
-                                exec_timeout = rospy.Duration(1.0),
                             ),
                             transitions={'succeeded':'MOVE_TO_BOX', 'preempted':'aborted'},
                             remapping={'waypoints':'box_waypoint'}
