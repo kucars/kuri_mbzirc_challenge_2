@@ -15,8 +15,8 @@
   </node>
 
   <node pkg="kuri_mbzirc_challenge_2_wrench_detection" type="wrench_detection_softkinetic.py" name="wrench_detection_softkinetic" output="screen" args="-e">
-    <remap to="/camera2/rgb/image_raw"   from="/softkinetic_camera/rgb/image_mono"/>
-    <remap to="/camera2/rgb/camera_info" from="/softkinetic_camera/rgb/camera_info"/>
+    <remap to="/camera2/image_raw"   from="/softkinetic_camera/rgb/image_mono"/>
+    <remap to="/camera2/camera_info" from="/softkinetic_camera/rgb/camera_info"/>
   </node>
 
   <!-- Navigation -->

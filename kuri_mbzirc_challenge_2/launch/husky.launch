@@ -14,6 +14,7 @@
   <arg name="velodyne_enabled" default="false"/>
   <arg name="ur5_enabled" default="false"/>
   <arg name="gripper_enabled" default="false"/>
+  <arg name="softkinetic_enabled" default="false"/>
 
 
   <include file="$(find kuri_mbzirc_sim)/launch/mbzirc_arena_2.launch" >
@@ -35,6 +36,7 @@
     <arg name="velodyne_enabled" default="$(arg velodyne_enabled)"/>
     <arg name="ur5_enabled" value="$(arg ur5_enabled)"/>
     <arg name="gripper_enabled" value="$(arg gripper_enabled)"/>
+    <arg name="softkinetic_enabled" value="$(arg softkinetic_enabled)"/>
   </include>
 
   <!--- Run Move Base -->

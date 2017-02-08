@@ -10,11 +10,12 @@
     <arg name="random_panel_wrenches" default="$(arg random_panel_wrenches)"/>
     <arg name="random_panel_location" default="$(arg random_panel_location)"/>
 
-    <arg name="laser_enabled"    value="true"/>
-    <arg name="kinect_enabled"   value="true"/>
-    <arg name="velodyne_enabled" value="true"/>
-    <arg name="ur5_enabled"      value="false"/>
-    <arg name="gripper_enabled"  value="false"/>
+    <arg name="laser_enabled"       value="true"/>
+    <arg name="kinect_enabled"      value="true"/>
+    <arg name="velodyne_enabled"    value="true"/>
+    <arg name="ur5_enabled"         value="false"/>
+    <arg name="gripper_enabled"     value="false"/>
+    <arg name="softkinetic_enabled" value="false"/>
   </include>
 
   <!-- Run visualizer -->

@@ -113,7 +113,7 @@ class WrenchDetection:
         self.tool_ROI_pub = rospy.Publisher("/ch2/detection/tool/bb_pixel", RegionOfInterest, queue_size = 1)
 
         self.tool_pos = PoseStamped()
-        self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1
+        self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1)
 
         rospy.loginfo("Started wrench detection node. Currently on standby")
 
