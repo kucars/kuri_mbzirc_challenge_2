@@ -78,6 +78,8 @@ class PanelDetection:
             print("Bypassing: " + node_name + " node enabled")
             self.enableNode()
 
+
+        ## Initialize variables
         self.tool_size = '18mm'
         sizes = OrderedDict({
             "13mm": (2.8, 16.8),
@@ -95,7 +97,8 @@ class PanelDetection:
             self.lab[i] = size
             self.toolSizes.append(name)
 
-        # Set up callbacks
+
+        ## Set up callbacks
         self.bridge = CvBridge()
 
         self.image_width = 1
@@ -182,11 +185,6 @@ class PanelDetection:
 
         # return the size label with the smallest distance
         return self.toolSizes[minDist[1]]
-
-    def execute(self, goal_msg):
-        # This node was called, perform any necessary changes here
-        self.enableNode()
-        rospy.loginfo("Panel detection node enabled")
 
 
     def camera_callback(self, data):

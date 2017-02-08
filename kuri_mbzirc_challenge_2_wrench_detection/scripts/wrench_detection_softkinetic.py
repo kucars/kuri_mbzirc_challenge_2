@@ -19,7 +19,6 @@ from sensor_msgs.msg import Image
 from sensor_msgs.msg import Image, RegionOfInterest
 from sensor_msgs.msg import CameraInfo
 from cv_bridge import CvBridge, CvBridgeError
-from kuri_mbzirc_challenge_2_msgs.msg import WrenchDetectionAction
 from scipy.spatial import distance
 from collections import OrderedDict
 import numpy as np
@@ -36,8 +35,7 @@ import glob
 from os.path import expanduser
 home = expanduser("~")
 
-node_name = "wrench_detection_server"
-topic_name = "wrench_detection"
+node_name = "wrench_detection_node"
 
 clos_kernel_sz = 5;
 
@@ -76,35 +74,19 @@ def auto_canny(image, sigma=0.33):
     # return the edged image
     return edged
 
-class WrenchDetectionServer:
+class WrenchDetection:
 
-    def __init__(self):
-        self.is_node_enabled = True
+    def __init__(self, is_bypass):
+        self.is_bypass = is_bypass
 
-        # Set up callbacks
-        self.bridge = CvBridge()
-        self.camera_sub = rospy.Subscriber('/softkinetic_camera/rgb/image_mono', Image, self.camera_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
-        #self.camera_sub = rospy.Subscriber('/softkinetic_camera/rgb/image_color', Image, self.camera_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
+        self.is_node_enabled = False
+        if (self.is_bypass):
+            print("Bypassing: " + node_name + " node enabled")
+            self.enableNode()
 
-        self.image_width = 1
-        self.image_height = 1
-        self.cameraInfo_sub = rospy.Subscriber("/softkinetic_camera/rgb/camera_info",CameraInfo,self.get_camera_info, queue_size = 1)
 
-        self.tool_ROI = RegionOfInterest()
-        self.tool_ROI_pub = rospy.Publisher("/ch2/detection/tool/bb_pixel", RegionOfInterest, queue_size = 1)
-
-        self.tool_pos = PoseStamped()
-        self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1)
-
-        # Start actionlib server
-        #self.server = actionlib.SimpleActionServer(topic_name, WrenchDetectionAction, self.execute, False)
-        #self.server.start()
-
-        rospy.loginfo("Started wrench detection node. Currently on standby")
-
+        ## Initialize variables
         self.tool_size = '14mm'
-
-
         sizes = OrderedDict({
             "13mm": (2.8, 16.8),
             "14mm": (3, 17.9),
@@ -120,6 +102,48 @@ class WrenchDetectionServer:
         for (i, (name, size)) in enumerate(sizes.items()):
             self.lab[i] = size
             self.toolSizes.append(name)
+
+
+        self.bridge = CvBridge()
+        self.image_width = 1
+        self.image_height = 1
+
+        ## Set up callbacks
+        self.tool_ROI = RegionOfInterest()
+        self.tool_ROI_pub = rospy.Publisher("/ch2/detection/tool/bb_pixel", RegionOfInterest, queue_size = 1)
+
+        self.tool_pos = PoseStamped()
+        self.tool_pos_pub = rospy.Publisher("/ch2/detection/tool/center_pose", PoseStamped, queue_size = 1
+
+        rospy.loginfo("Started wrench detection node. Currently on standby")
+
+        while (not rospy.is_shutdown()):
+            subs = self.getNumOfSubscribers()
+            if (subs > 0 and not self.is_node_enabled):
+                self.enableNode()
+
+            elif (subs == 0 and self.is_node_enabled and not self.is_bypass):
+                self.disableNode()
+
+            time.sleep(0.05) # delays for 50ms
+
+    def getNumOfSubscribers(self):
+        s = self.tool_ROI_pub.get_num_connections() + \
+            self.tool_pos_pub.get_num_connections()
+
+        return s
+
+    def enableNode(self):
+        print("Enabled node " + node_name)
+        self.is_node_enabled = True
+        self.camera_sub = rospy.Subscriber('/softkinetic_camera/rgb/image_mono', Image, self.camera_callback, queue_size=1, buff_size=2**24, tcp_nodelay=True)
+        self.cameraInfo_sub = rospy.Subscriber("/softkinetic_camera/rgb/camera_info",CameraInfo,self.get_camera_info, queue_size = 1)
+
+    def disableNode(self):
+        print("Disabled node " + node_name)
+        self.is_node_enabled = False
+        self.camera_sub.unregister()
+        self.cameraInfo_sub.unregister()
 
     def get_camera_info(self, msg):
         self.image_width = msg.width
@@ -142,12 +166,6 @@ class WrenchDetectionServer:
 
         # return the size label with the smallest distance
         return self.toolSizes[minDist[1]]
-
-
-    def execute(self, goal_msg):
-        # This node was called, perform any necessary changes here
-        self.is_node_enabled = True
-        rospy.loginfo("Wrench detection node enabled")
 
 
     def camera_callback(self, data):
@@ -520,23 +538,14 @@ class WrenchDetectionServer:
         cv2.waitKey(3)
 
 
-        # If the wrenches are detected, return the region of interest
-        #p1 = Point(0 ,0 ,0)
-        #p2 = Point(10,0 ,0)
-        #p3 = Point(10,10,0)
-        #p4 = Point(0 ,10,0)
-
-        #rospy.loginfo("Found wrench")
-        #result = WrenchDetectionResult()
-
-        #result.ROI = [p1, p2, p3, p4]
-        #self.server.set_succeeded(result)
-
-        # Disable the node since it found its target
-        #self.is_node_enabled = False
-
-
 if __name__ == '__main__':
     rospy.init_node(node_name)
-    server = WrenchDetectionServer()
+
+    is_bypass = False
+    for i in range(0,len(sys.argv)):
+        if sys.argv[1] == "-e":
+          is_bypass = True
+          break
+
+    WrenchDetection(is_bypass)
     rospy.spin()
