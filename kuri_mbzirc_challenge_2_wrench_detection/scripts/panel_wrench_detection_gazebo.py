@@ -180,6 +180,7 @@ class WrenchDetectionServer:
 		kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(4,50))
 		filled = cv2.morphologyEx(edged4, cv2.MORPH_CLOSE, kernel)
 
+		"""
 		cv2.imshow("thresh", thresh)
 		cv2.waitKey(10)
 
@@ -188,6 +189,7 @@ class WrenchDetectionServer:
 
 		cv2.imshow("filled", filled)
 		cv2.waitKey(10)
+		"""
 
 		# find contours in the thresholded image and initialize the shape detector
 		#cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)

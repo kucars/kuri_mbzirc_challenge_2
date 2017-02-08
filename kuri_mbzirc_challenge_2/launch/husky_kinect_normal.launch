@@ -2,11 +2,11 @@
 
 <launch>
   <arg name="robot_initial_pose" default="-x 6  -y 5 -z 0.1 -Y 3.14" />
-  <arg name="random_panel" default="false" />
+  <arg name="random_panel" default="true" />
 
   <arg name="laser_enabled"    default="true"/>
   <arg name="kinect_enabled"   default="true"/>
-  <arg name="velodyne_enabled" default="false"/>
+  <arg name="velodyne_enabled" default="true"/>
   <arg name="ur5_enabled"      default="false"/>
   <arg name="gripper_enabled"  default="false"/>
 
