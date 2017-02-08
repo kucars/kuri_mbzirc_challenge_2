@@ -34,6 +34,9 @@ add_executable(kuri_wrench_detection_cloudImgPub src/kuri_wrench_detection_cloud
 target_link_libraries(kuri_wrench_detection_cloudImgPub ${catkin_LIBRARIES})
 add_dependencies(kuri_wrench_detection_cloudImgPub ${catkin_EXPORTED_TARGETS})
 
+add_executable(plane_orientation src/plane_orientation.cpp)
+target_link_libraries(plane_orientation ${catkin_LIBRARIES})
+
 #############
 ## Install ##
 #############
