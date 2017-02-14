@@ -46,6 +46,7 @@ before_install:
   # Install Firmware-needed libraries:
   #- sudo apt-get install python-argparse git-core wget zip python-empy qtcreator cmake build-essential genromfs -y
   #- sudo apt-get install ant protobuf-compiler libeigen3-dev libopencv-dev clang-3.5 lldb-3.5 -y
+  - sudo apt-get install ros-indigo-trac-ik
 
 # Use this to install any prerequisites or dependencies necessary to run your build
 install:
