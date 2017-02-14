@@ -21,26 +21,35 @@ topic_name = "wrench_detection"
 class WrenchDetectionServer:
 
     def __init__(self, is_bypass):
+        ##########
+        ## Initialize state machine interface
+        ##########
         self.is_bypass = is_bypass
 
         self.is_node_enabled = False
         if (self.is_bypass):
             self.is_node_enabled = True
 
-        # Set up callbacks
-        self.camera_sub = rospy.Subscriber('/camera', Image, self.camera_callback, queue_size=20)
-
         # Start actionlib server
         self.server = actionlib.SimpleActionServer(topic_name, WrenchDetectionAction, self.execute, False)
         self.server.start()
 
-        rospy.loginfo("Started wrench detection node. Currently on standby")
+        rospy.loginfo("Started " + node_name + " node. Currently on standby")
+
+        ##########
+        ## Initialize node
+        ##########
+        # Variables
+        self.variable = 0
+
+        # Set up callbacks
+        self.camera_sub = rospy.Subscriber('/camera', Image, self.camera_callback, queue_size=20)
 
 
     def execute(self, goal_msg):
         # This node was called, perform any necessary changes here
         self.is_node_enabled = True
-        rospy.loginfo("Wrench detection node enabled")
+        rospy.loginfo(node_name + " node enabled")
 
 
     def camera_callback(self, data):
