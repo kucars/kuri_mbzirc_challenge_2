@@ -26,6 +26,6 @@
     uri: https://bitbucket.org/DataspeedInc/velodyne_simulator.git
     version:  b2b4496
 
-- git:
-    local-name: trac-ik
-    uri: https://bitbucket.org/traclabs/trac_ik.git
+#- git:
+#    local-name: trac-ik
+#    uri: https://bitbucket.org/traclabs/trac_ik.git
