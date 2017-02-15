@@ -120,40 +120,23 @@ void BoxPositionActionHandler::callbackOdom(const nav_msgs::Odometry::ConstPtr& 
   current_odom = *odom_msg;
 }
 
-void BoxPositionActionHandler::getInitialBoxClusters()
+PcCloudPtr BoxPositionActionHandler::filterCloudRangeAngle(PcCloudPtr cloud_ptr, double r_min, double r_max, double a_min, double a_max)
 {
-  // >>>>>>>>>
-  // Initialize
-  // >>>>>>>>>
-  cluster_list.clear();
+  double laser_min_range = r_min * r_min;
+  double laser_max_range = r_max * r_max;
+  double laser_min_angle = a_min;
+  double laser_max_angle = a_max;
+
   bool check_angle = true;
-
-  if (range_max_ == 0 && range_max_ == 0)
-  {
-    range_max_ = 60.0;
-    range_min_ = 1.0;
-  }
-
-  if (angle_max_ == 0 && angle_min_ == 0)
-  {
-    angle_max_ = M_PI;
-    angle_min_ = -M_PI;
+  if (a_max >= M_PI && a_min <= -M_PI)
     check_angle = false;
-  }
-
-  double laser_min_range = range_min_ * range_min_;
-  double laser_max_range = range_max_ * range_max_;
-  double laser_min_angle = angle_min_;
-  double laser_max_angle = angle_max_;
-
-
 
   // Filter out points that are too close or too far, or out of range
   PcCloudPtr cloud_filtered (new PcCloud);
 
-  for (int i=0; i<pc_current_->points.size(); i++)
+  for (int i=0; i < cloud_ptr->points.size(); i++)
   {
-    PcPoint p = pc_current_->points[i];
+    PcPoint p = cloud_ptr->points[i];
     double r = p.x*p.x + p.y*p.y;
     if (r > laser_max_range || r < laser_min_range)
       continue;
@@ -168,6 +151,29 @@ void BoxPositionActionHandler::getInitialBoxClusters()
     cloud_filtered->points.push_back (p);
   }
 
+  return cloud_filtered;
+}
+
+void BoxPositionActionHandler::getInitialBoxClusters()
+{
+  // >>>>>>>>>
+  // Initialize
+  // >>>>>>>>>
+  cluster_list.clear();
+
+  if (range_max_ == 0 && range_max_ == 0)
+  {
+    range_max_ = 60.0;
+    range_min_ = 1.0;
+  }
+
+  if (angle_max_ == 0 && angle_min_ == 0)
+  {
+    angle_max_ = M_PI;
+    angle_min_ = -M_PI;
+  }
+
+  PcCloudPtr cloud_filtered = filterCloudRangeAngle(pc_current_, range_min_, range_max_, angle_min_, angle_max_);
 
   PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
 
@@ -180,6 +186,7 @@ void BoxPositionActionHandler::getInitialBoxClusters()
 
     cluster_list.push_back(b);
   }
+
 
   is_initiatializing_ = false;
 }
@@ -225,35 +232,14 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   if (is_initiatializing_)
   {
     getInitialBoxClusters();
-    pc_prev_ = pc_current_;
+    drawClusters(cloud_msg->header.frame_id);
+
     return;
   }
 
-  /*
-  printf("\n");
-  for (int i=0; i<cluster_list.size(); i++)
-  {
-    BoxCluster b = cluster_list[i];
-    printf("Cluster %d\n"
-           "  Point Count:  %lu\n"
-           "  Confidence:   %2.1f\n",
-           i,
-           b.point_cloud->points.size(),
-           b.confidence.getProbability()*100);
 
+  // Find transform between previous and current data
 
-    sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*cluster_list[i].point_cloud, cloud_cluster_msg);
-    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
-    cloud_cluster_msg.header.stamp = ros::Time::now();
-    pub_wall.publish(cloud_cluster_msg);
-
-    if (cluster_list.size() > 1)
-      usleep(200*1000);
-  }
-  */
-
-  pc_prev_ = pc_current_;
 
   /*
   PcCloudPtr cloud_filtered = pc_current_;
@@ -287,6 +273,11 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
 
   PcCloudPtr cluster_cloud = pc_vector[0];
   */
+
+  // Display clouds
+  drawClusters(cloud_msg->header.frame_id);
+
+  pc_prev_ = pc_current_;
 }
 
 void BoxPositionActionHandler::computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners)
@@ -377,6 +368,31 @@ void BoxPositionActionHandler::drawPoints(std::vector<geometry_msgs::Point> poin
   marker_msg.points = points;
 
   pub_points.publish(marker_msg);
+}
+
+void BoxPositionActionHandler::drawClusters(std::string frame_id)
+{
+  printf("\n");
+  for (int i=0; i<cluster_list.size(); i++)
+  {
+    BoxCluster b = cluster_list[i];
+    printf("Cluster %d\n"
+           "  Point Count:  %lu\n"
+           "  Confidence:   %2.1f\n",
+           i,
+           b.point_cloud->points.size(),
+           b.confidence.getProbability()*100);
+
+
+    sensor_msgs::PointCloud2 cloud_cluster_msg;
+    pcl::toROSMsg(*cluster_list[i].point_cloud, cloud_cluster_msg);
+    cloud_cluster_msg.header.frame_id = frame_id;
+    cloud_cluster_msg.header.stamp = ros::Time::now();
+    pub_wall.publish(cloud_cluster_msg);
+
+    if (cluster_list.size() > 1)
+      usleep(200*1000);
+  }
 }
 
 PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)

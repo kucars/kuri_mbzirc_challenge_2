@@ -143,8 +143,10 @@ public:
   PcCloudPtrList getCloudClusters(PcCloudPtr cloud_ptr);
   void           getInitialBoxClusters();
   PcCloudPtrList extractBoxClusters(PcCloudPtr cloud_ptr);
+  PcCloudPtr     filterCloudRangeAngle(PcCloudPtr cloud_ptr, double r_min, double r_max, double a_min = -M_PI, double a_max = M_PI);
 
   void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
+  void drawClusters(std::string frame_id);
 
   std::vector<double> generateRange(double start, double end, double step);
   Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t);
