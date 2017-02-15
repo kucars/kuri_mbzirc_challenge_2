@@ -29,6 +29,7 @@
 
 #include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
 #include "../include/kuri_mbzirc_challenge_2_panel_detection/velodyne_box_detector.h"
+#include "utilities/pose_conversion.h"
 
 #include <unistd.h>
 
@@ -39,7 +40,11 @@ BoxPositionActionHandler::BoxPositionActionHandler(std::string name) :
   action_name_(name),
   is_initiatializing_(false)
 {
-  detect_new_distance_ = 30; //Look for new clusters past this range
+  detect_new_distance_ = 20; //Look for new clusters past this range
+
+  // Selected so that total confidence is 0.8 @ 5m and 0.55 @ 60m
+  confidence_update_base_ = 0.353;
+  confidence_update_lambda_ = 0.0325;
 
   pub_wall  = nh_.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
   pub_lines = nh_.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
@@ -176,12 +181,13 @@ void BoxPositionActionHandler::getInitialBoxClusters()
   PcCloudPtr cloud_filtered = filterCloudRangeAngle(pc_current_, range_min_, range_max_, angle_min_, angle_max_);
 
   PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
+  std::vector<geometry_msgs::Pose> poses = getPanelPose(pc_vector);
 
   for (int i=0; i<pc_vector.size(); i++)
   {
     BoxCluster b;
     b.point_cloud = pc_vector[i];
-    b.pose.position.x = 0;
+    b.pose = poses[i];
     b.confidence.setProbability(0.7);
 
     cluster_list.push_back(b);
@@ -219,6 +225,37 @@ PcCloudPtrList BoxPositionActionHandler::extractBoxClusters(PcCloudPtr cloud_ptr
   return pc_vector_clustered;
 }
 
+std::vector<geometry_msgs::Pose> BoxPositionActionHandler::getPanelPose(PcCloudPtrList clusters)
+{
+  std::vector<geometry_msgs::Pose> poses;
+
+  // Compute centroid of each box
+  for (int ic=0; ic<clusters.size(); ic++)
+  {
+    PcCloudPtr pc = clusters[ic];
+    geometry_msgs::Pose p;
+
+    double pc_size = pc->points.size();
+
+    for (int ip=0; ip < pc_size; ip++)
+    {
+      PcPoint pt = pc->points[ip];
+      p.position.x += pt.x;
+      p.position.y += pt.y;
+      p.position.z += pt.z;
+    }
+
+    p.position.x /= pc_size;
+    p.position.y /= pc_size;
+    p.position.z /= pc_size;
+
+    poses.push_back(p);
+  }
+
+
+  return poses;
+}
+
 
 void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 {
@@ -237,8 +274,99 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
     return;
   }
 
+  // @todo: Find transform between previous and current data
+  std::cout << "MUST IMPLIMENT TRANSFORM IN velodyne_box_detector\n";
 
-  // Find transform between previous and current data
+
+  PcCloudPtr cloud_filtered = filterCloudRangeAngle(pc_current_, range_min_, range_max_, angle_min_, angle_max_);
+  PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
+  std::vector<geometry_msgs::Pose> poses = getPanelPose(pc_vector);
+
+  // Create vector to track updates
+  std::vector<bool> is_updated_prev;
+  for (int ib=0; ib < pc_vector.size(); ib++)
+    is_updated_prev.push_back(false);
+
+  /*
+  std::vector<bool> is_inserted_current;
+  for (int ib=0; ib < pc_vector.size(); ib++)
+    is_inserted_current.push_back(false);
+  */
+
+
+  //
+  // Use current information to update past data
+  //
+  for (int i_curr=0; i_curr<pc_vector.size(); i_curr++)
+  {
+    BoxCluster b1;
+    b1.point_cloud = pc_vector[i_curr];
+    b1.pose = poses[i_curr];
+    b1.confidence.setProbability(0.5);
+
+    // Find closest box
+    double r_min = 1/.0;
+    int idx = -1;
+
+    for (int i_prev = 0; i_prev < cluster_list.size(); i_prev++)
+    {
+      BoxCluster b2 = cluster_list[i_prev];
+      double r = computeDistance(b1.pose, b2.pose);
+      if (r < r_min)
+      {
+        r_min = r;
+        idx = i_prev;
+      }
+    }
+
+    // Check matching
+    if (idx > -1)
+    {
+      // Match found, update it
+      cluster_list[idx].point_cloud = b1.point_cloud;
+      cluster_list[idx].pose = b1.pose;
+
+      double dist = computeDistance(b1.pose); //distance from origin
+      double p = 0.5 + confidence_update_base_*exp(-confidence_update_lambda_*dist);
+
+      cluster_list[idx].confidence.updateProbability(p);
+      is_updated_prev[idx] = true;
+    }
+    else
+    {
+      // Match not found. Add to list
+      cluster_list.push_back(b1);
+    }
+  }
+
+
+  // Check if we updated all previous past data. If not, decrease their confidence
+  for (int i_prev=0; i_prev<cluster_list.size(); i_prev++)
+  {
+    if (is_updated_prev[i_prev])
+      continue;
+
+    // Highly confident there is nothing if it's not detected up close
+    double dist = computeDistance(cluster_list[i_prev].pose); //distance from origin
+    double p = 0.5 - confidence_update_base_*exp(-confidence_update_lambda_*dist);
+
+    cluster_list[i_prev].confidence.updateProbability(p);
+  }
+
+
+  // Delete any entries below a threshold
+  int i=0;
+  while ( i < cluster_list.size() )
+  {
+      double p = cluster_list[i].confidence.getProbability();
+      if ( p < 0.3 )
+      {
+          cluster_list.erase( cluster_list.begin() + i );
+      } else
+      {
+          i++;
+      }
+  }
 
 
   /*
@@ -278,6 +406,20 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   drawClusters(cloud_msg->header.frame_id);
 
   pc_prev_ = pc_current_;
+}
+
+double BoxPositionActionHandler::computeDistance(geometry_msgs::Pose p1)
+{
+  double x = p1.position.x, y = p1.position.y, z = p1.position.z;
+  return sqrt(x*x + y*y + z*z);
+}
+
+double BoxPositionActionHandler::computeDistance(geometry_msgs::Pose p1, geometry_msgs::Pose p2)
+{
+  double x = p1.position.x - p2.position.x;
+  double y = p1.position.y - p2.position.y;
+  double z = p1.position.z - p2.position.z;
+  return sqrt(x*x + y*y + z*z);
 }
 
 void BoxPositionActionHandler::computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners)
@@ -372,15 +514,15 @@ void BoxPositionActionHandler::drawPoints(std::vector<geometry_msgs::Point> poin
 
 void BoxPositionActionHandler::drawClusters(std::string frame_id)
 {
-  printf("\n");
+  printf("\nCluster | Points | Distance |  Angle  | Confidence\n");
   for (int i=0; i<cluster_list.size(); i++)
   {
     BoxCluster b = cluster_list[i];
-    printf("Cluster %d\n"
-           "  Point Count:  %lu\n"
-           "  Confidence:   %2.1f\n",
+    printf("  %3d     %4lu       %2.1f     %3.1f      %2.1f\n",
            i,
            b.point_cloud->points.size(),
+           computeDistance(b.pose),
+           RAD2DEG( atan2(b.pose.position.x, b.pose.position.y) ),
            b.confidence.getProbability()*100);
 
 
@@ -428,67 +570,6 @@ PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)
 
   return pc_vector;
 }
-
-Eigen::Matrix4d BoxPositionActionHandler::convertStampedTransform2Matrix4d(tf::StampedTransform t)
-{
-  // Get translation
-  Eigen::Vector3d T1(
-      t.getOrigin().x(),
-      t.getOrigin().y(),
-      t.getOrigin().z()
-  );
-
-  // Get rotation matrix
-  tf::Quaternion qt = t.getRotation();
-  tf::Matrix3x3 R1(qt);
-
-  Eigen::Matrix3d R;
-  tf::matrixTFToEigen(R1,R);
-
-  // Set
-  Eigen::Matrix4d tf_eigen;
-  tf_eigen.setZero ();
-  tf_eigen.block (0, 0, 3, 3) = R;
-  tf_eigen.block (0, 3, 3, 1) = T1;
-  tf_eigen (3, 3) = 1;
-
-  return tf_eigen;
-}
-
-std::vector<double> BoxPositionActionHandler::generateRange(double start, double end, double step)
-{
-  std::vector<double> vec;
-
-  vec.push_back(start);
-
-  while(1)
-  {
-    start += step;
-    vec.push_back(start);
-
-    if (start > end)
-      break;
-  }
-
-  return vec;
-}
-
-geometry_msgs::Quaternion BoxPositionActionHandler::getQuaternionFromYaw(double yaw)
-{
-  geometry_msgs::Quaternion quat;
-
-  tf::Quaternion tf_q;
-  tf_q = tf::createQuaternionFromYaw(yaw);
-
-  quat.x = tf_q.getX();
-  quat.y = tf_q.getY();
-  quat.z = tf_q.getZ();
-  quat.w = tf_q.getW();
-
-  return quat;
-}
-
-
 
 int main(int argc, char **argv)
 {

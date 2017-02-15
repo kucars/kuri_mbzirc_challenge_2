@@ -117,6 +117,10 @@ protected:
   double angle_min_;
   double detect_new_distance_;
 
+  // Update confidence based on: 0.5 + base*exp(-lambda*distace)
+  double confidence_update_base_;\
+  double confidence_update_lambda_;
+
   std::vector<BoxCluster> cluster_list;
   PcCloudPtr pc_current_;
   PcCloudPtr pc_prev_;
@@ -139,18 +143,18 @@ public:
   void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
   void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
 
-  void           computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners);
-  PcCloudPtrList getCloudClusters(PcCloudPtr cloud_ptr);
-  void           getInitialBoxClusters();
-  PcCloudPtrList extractBoxClusters(PcCloudPtr cloud_ptr);
-  PcCloudPtr     filterCloudRangeAngle(PcCloudPtr cloud_ptr, double r_min, double r_max, double a_min = -M_PI, double a_max = M_PI);
+  void              computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners);
+  PcCloudPtrList    getCloudClusters(PcCloudPtr cloud_ptr);
+  void              getInitialBoxClusters();
+  std::vector<geometry_msgs::Pose>   getPanelPose(PcCloudPtrList);
+  PcCloudPtrList    extractBoxClusters(PcCloudPtr cloud_ptr);
+  PcCloudPtr        filterCloudRangeAngle(PcCloudPtr cloud_ptr, double r_min, double r_max, double a_min = -M_PI, double a_max = M_PI);
 
   void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
   void drawClusters(std::string frame_id);
 
-  std::vector<double> generateRange(double start, double end, double step);
-  Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t);
-  geometry_msgs::Quaternion getQuaternionFromYaw(double yaw);
+  double computeDistance(geometry_msgs::Pose p1);
+  double computeDistance(geometry_msgs::Pose p1, geometry_msgs::Pose p2);
 };
 
 #endif
