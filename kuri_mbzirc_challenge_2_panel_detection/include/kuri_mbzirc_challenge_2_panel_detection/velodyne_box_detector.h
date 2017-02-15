@@ -22,11 +22,79 @@ typedef pcl::PointCloud<PcPoint>::Ptr PcCloudPtr;
 typedef std::vector<PcCloudPtr> PcCloudPtrList;
 
 
+class Belief
+{
+protected:
+  double logodds_;
+  double max_odds_;
+  double min_odds_;
+
+public:
+  Belief()
+  {
+    logodds_ = 0;
+    max_odds_ = 5; //equivalent to 99.33%
+    min_odds_ =-5; //equivalent to  0.67%
+  }
+
+  static double probability2Logodds(double p)
+  {
+    return log(p/(1-p));
+  }
+
+  static double logodds2Probability(double logodds)
+  {
+    double e;
+    e = exp(logodds);
+    return e/(1+e);
+  }
+
+  double getProbability()
+  {
+    return Belief::logodds2Probability(logodds_);
+  }
+
+  double getLogOdds(){
+    return logodds_;
+  }
+
+  void setProbability(double x)
+  {
+    if (x > 1 || x < 0)
+      throw std::invalid_argument( "Probability must be between 0 and 1" );
+
+    logodds_ = Belief::probability2Logodds(x);
+  }
+
+  void setLogodds(double x)
+  {
+    logodds_ = x;
+  }
+
+  void updateLogodds(double x)
+  {
+    logodds_ += x;
+
+    // Check for clamping
+    if (logodds_ > max_odds_)
+      logodds_ = max_odds_;
+    else if (logodds_ < min_odds_)
+      logodds_ = min_odds_;
+  }
+
+  void updateProbability(double x)
+  {
+    if (x > 1 || x < 0)
+      throw std::invalid_argument( "Probability must be between 0 and 1" );
+
+    updateLogodds( Belief::probability2Logodds(x) );
+  }
+};
 
 struct BoxCluster{
-  sensor_msgs::PointCloud2 point_cloud;
+  PcCloudPtr point_cloud;
   geometry_msgs::Pose pose;
-  double confidence;
+  Belief confidence;
 };
 
 // ======
@@ -71,9 +139,9 @@ public:
   void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
   void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
 
-  void computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners);
-  void getCloudClusters(PcCloudPtr cloud_ptr, PcCloudPtrList& pc_vector);
-  void getInitialBoxClusters();
+  void           computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners);
+  PcCloudPtrList getCloudClusters(PcCloudPtr cloud_ptr);
+  void           getInitialBoxClusters();
   PcCloudPtrList extractBoxClusters(PcCloudPtr cloud_ptr);
 
   void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);

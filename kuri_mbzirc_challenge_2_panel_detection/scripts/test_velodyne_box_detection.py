@@ -58,7 +58,7 @@ class mbzirc_c2_auto():
     self.execute(goal)
     rospy.loginfo("Started")
 
-    time.sleep(10)
+    time.sleep(30)
 
     rospy.loginfo("Sending stop command")
     goal = BoxPositionGoal()

@@ -167,7 +167,51 @@ void BoxPositionActionHandler::getInitialBoxClusters()
 
     cloud_filtered->points.push_back (p);
   }
+
+
+  PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
+
+  for (int i=0; i<pc_vector.size(); i++)
+  {
+    BoxCluster b;
+    b.point_cloud = pc_vector[i];
+    b.pose.position.x = 0;
+    b.confidence.setProbability(0.7);
+
+    cluster_list.push_back(b);
+  }
+
+  is_initiatializing_ = false;
 }
+
+
+PcCloudPtrList BoxPositionActionHandler::extractBoxClusters(PcCloudPtr cloud_ptr)
+{
+  PcCloudPtrList pc_vector;
+
+  if (cloud_ptr->points.size() == 0)
+    return pc_vector;
+
+  // Get clusters
+  pc_vector = getCloudClusters(cloud_ptr);
+
+  // Get size of each cluster
+  std::vector<Eigen::Vector3f> dimension_list;
+  std::vector<Eigen::Vector4f> centroid_list;
+  std::vector<std::vector<PcPoint> > corners_list;
+  computeBoundingBox(pc_vector, dimension_list, centroid_list, corners_list);
+
+  // Only keep the clusters that are likely to be panels
+  PcCloudPtrList pc_vector_clustered;
+  for (int i = 0; i< dimension_list.size(); i++)
+  {
+    if (dimension_list[i][2] <= 1.5 && dimension_list[i][1] <= 1.5)
+      pc_vector_clustered.push_back(pc_vector[i]);
+  }
+
+  return pc_vector_clustered;
+}
+
 
 void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 {
@@ -181,70 +225,68 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   if (is_initiatializing_)
   {
     getInitialBoxClusters();
+    pc_prev_ = pc_current_;
     return;
   }
 
-  PcCloudPtr cloud_filtered = pc_current_;
-
-  if (cloud_filtered->points.size() == 0)
+  /*
+  printf("\n");
+  for (int i=0; i<cluster_list.size(); i++)
   {
-    std::cout << "No laser points detected nearby.\n";
-    //setSuccess(false);
-    return;
-  }
+    BoxCluster b = cluster_list[i];
+    printf("Cluster %d\n"
+           "  Point Count:  %lu\n"
+           "  Confidence:   %2.1f\n",
+           i,
+           b.point_cloud->points.size(),
+           b.confidence.getProbability()*100);
 
 
-  // Get clusters
-  PcCloudPtrList pc_vector;
-  getCloudClusters(cloud_filtered, pc_vector);
-
-
-  // Get size of each cluster
-  std::vector<Eigen::Vector3f> dimension_list;
-  std::vector<Eigen::Vector4f> centroid_list;
-  std::vector<std::vector<PcPoint> > corners_list;
-  computeBoundingBox(pc_vector, dimension_list, centroid_list, corners_list);
-
-
-  // Only keep the clusters that are likely to be panels
-  PcCloudPtrList pc_vector_clustered;
-  for (int i = 0; i< dimension_list.size(); i++)
-  {
-    if (dimension_list[i][2] <= 1.5 && dimension_list[i][1] <= 1.5)
-      pc_vector_clustered.push_back(pc_vector[i]);
-  }
-
-
-  if (pc_vector_clustered.size() == 0)
-  {
-    std::cout << "Could not find panel cluster.\n";
-    //setSuccess(false);
-    return;
-  }
-
-  // Publish cluster clouds
-  for (int i=0; i<pc_vector_clustered.size(); i++)
-  {
     sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*pc_vector_clustered[i], cloud_cluster_msg);
+    pcl::toROSMsg(*cluster_list[i].point_cloud, cloud_cluster_msg);
     cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
     cloud_cluster_msg.header.stamp = ros::Time::now();
     pub_wall.publish(cloud_cluster_msg);
 
-    if (pc_vector_clustered.size() > 1)
+    if (cluster_list.size() > 1)
+      usleep(200*1000);
+  }
+  */
+
+  pc_prev_ = pc_current_;
+
+  /*
+  PcCloudPtr cloud_filtered = pc_current_;
+
+  // Get clusters
+  PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
+
+  if (pc_vector.size() == 0)
+  {
+    std::cout << "Could not find panel cluster.\n";
+    return;
+  }
+
+  // Publish cluster clouds
+  for (int i=0; i<pc_vector.size(); i++)
+  {
+    sensor_msgs::PointCloud2 cloud_cluster_msg;
+    pcl::toROSMsg(*pc_vector[i], cloud_cluster_msg);
+    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
+    cloud_cluster_msg.header.stamp = ros::Time::now();
+    pub_wall.publish(cloud_cluster_msg);
+
+    if (pc_vector.size() > 1)
       usleep(200*1000);
   }
 
-  /* Select one cloud */
-  if (pc_vector_clustered.size() > 1)
+  if (pc_vector.size() > 1)
   {
     std::cout << "Found multiple panel clusters. Using the first one.\n";
   }
 
-  PcCloudPtr cluster_cloud = pc_vector_clustered[0];
-
-  is_initiatializing_ = false;
-
+  PcCloudPtr cluster_cloud = pc_vector[0];
+  */
 }
 
 void BoxPositionActionHandler::computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners)
@@ -337,16 +379,18 @@ void BoxPositionActionHandler::drawPoints(std::vector<geometry_msgs::Point> poin
   pub_points.publish(marker_msg);
 }
 
-void BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr, PcCloudPtrList& pc_vector)
+PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)
 {
+   PcCloudPtrList pc_vector;
+
   // Creating the KdTree object for the search method of the extraction
   pcl::search::KdTree<PcPoint>::Ptr tree (new pcl::search::KdTree<PcPoint>);
   tree->setInputCloud (cloud_ptr);
 
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<PcPoint> ec;
-  ec.setClusterTolerance (0.5); // 50cm - big since we're sure the panel is far from other obstacles (ie. barriers)
-  ec.setMinClusterSize (3);
+  ec.setClusterTolerance (0.5); // up to 50cm btw points - big since we're sure the panel is far from other obstacles
+  ec.setMinClusterSize (3);     // at least 3 points
   ec.setMaxClusterSize (1000);
   ec.setSearchMethod (tree);
   ec.setInputCloud (cloud_ptr);
@@ -365,14 +409,9 @@ void BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr, PcCloudPtr
 
     pc_vector.push_back(cloud_cluster);
   }
+
+  return pc_vector;
 }
-
-
-PcCloudPtrList extractBoxClusters(PcCloudPtr cloud_ptr)
-{
-
-}
-
 
 Eigen::Matrix4d BoxPositionActionHandler::convertStampedTransform2Matrix4d(tf::StampedTransform t)
 {
