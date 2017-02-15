@@ -35,3 +35,6 @@ add_executable(circumnavigation_waypoints src/circumnavigation_waypoints.cpp)
 target_link_libraries(circumnavigation_waypoints ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(circumnavigation_waypoints ${catkin_EXPORTED_TARGETS})
 
+add_executable(velodyne_box_detector src/velodyne_box_detector.cpp)
+target_link_libraries(velodyne_box_detector ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(velodyne_box_detector ${catkin_EXPORTED_TARGETS})
