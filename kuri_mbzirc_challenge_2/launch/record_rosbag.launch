@@ -4,9 +4,9 @@
   <arg name="record_velodyne" default="true" />
   <arg name="record_kinect" default="true" />
 
- <node pkg="rosbag" type="rosbag" name="rosbag_record_cam"
+ <node pkg="rosbag" type="record" name="rosbag_record_cam"
        if="$(arg record_kinect)"
-       args="record -o kinect
+       args="-o $(find kuri_mbzirc_challenge_2)/rosbag/kinect
         /kinect2/qhd/camera_info
         /kinect2/qhd/image_color/compressed
 
@@ -15,14 +15,14 @@
         ch2/detection/valve/center_pose"
         />
 
- <node pkg="rosbag" type="rosbag" name="rosbag_record_velodyne"
+ <node pkg="rosbag" type="record" name="rosbag_record_velodyne"
        if="$(arg record_velodyne)"
-       args="record -o kinect 
+       args="-o $(find kuri_mbzirc_challenge_2)/rosbag/velodyne 
         /velodyne_points"
         />
 
- <node pkg="rosbag" type="rosbag" name="rosbag_record_diag"
-       args="record -o diagnostics
+ <node pkg="rosbag" type="record" name="rosbag_record_diag"
+       args="-o $(find kuri_mbzirc_challenge_2)/rosbag/diagnostics
         /diagnostics
         /tf
         

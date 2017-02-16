@@ -8,6 +8,6 @@
   </include>
 
   <!--Run state machine -->
-  <node args="-e" pkg="kuri_mbzirc_challenge_2_system_coordinator" type="state_machine.py" name="state_machine"/>
+  <node args="default" pkg="kuri_mbzirc_challenge_2_system_coordinator" type="state_machine.py" name="state_machine"/>
 
 </launch>
