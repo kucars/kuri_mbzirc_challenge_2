@@ -1,42 +1,219 @@
-#include <Eigen/Core>
+﻿#include <Eigen/Core>
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
+#include <pcl/point_representation.h>
+
 #include <pcl/common/time.h>
-#include <pcl/console/print.h>
-#include <pcl/features/normal_3d_omp.h>
-#include <pcl/features/fpfh_omp.h>
+
+#include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/filter.h>
 #include <pcl/filters/passthrough.h>
-#include <pcl/filters/voxel_grid.h>
-#include <pcl/io/pcd_io.h>
+
+#include <pcl/features/normal_3d.h>
+
 #include <pcl/registration/icp.h>
-#include <pcl/registration/sample_consensus_prerejective.h>
-#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/registration/icp_nl.h>
+#include <pcl/registration/transforms.h>
+
 #include <pcl/visualization/pcl_visualizer.h>
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
 
-// Types
-
-typedef pcl::PointXYZ PointPT;
-typedef pcl::PointNormal PointNT;
-typedef pcl::PointCloud<PointPT> PointCloudPT;
-typedef pcl::PointCloud<PointNT> PointCloudNT;
-typedef pcl::FPFHSignature33 FeatureT;
-typedef pcl::FPFHEstimationOMP<PointNT,PointNT,FeatureT> FeatureEstimationT;
-typedef pcl::PointCloud<FeatureT> FeatureCloudT;
-typedef pcl::visualization::PointCloudColorHandlerCustom<PointNT> ColorHandlerNT;
-typedef pcl::visualization::PointCloudColorHandlerCustom<PointPT> ColorHandlerPT;
 
 
+//convenient typedefs
+typedef pcl::PointXYZ PointT;
+typedef pcl::PointCloud<PointT> PointCloud;
+typedef pcl::PointNormal PointNormalT;
+typedef pcl::PointCloud<PointNormalT> PointCloudWithNormals;
+
+// This is a tutorial so we can afford having global variables
+pcl::visualization::PCLVisualizer *p;
+int vp_1, vp_2;
 
 bool is_initialized_ = false;
 bool is_done_ = false;
-PointCloudPT::Ptr pc_current_, pc_prev_;
+PointCloud::Ptr pc_current_, pc_prev_;
+
+
+//convenient structure to handle our pointclouds
+struct PCD
+{
+  PointCloud::Ptr cloud;
+  std::string f_name;
+
+  PCD() : cloud (new PointCloud) {};
+};
+
+struct PCDComparator
+{
+  bool operator () (const PCD& p1, const PCD& p2)
+  {
+    return (p1.f_name < p2.f_name);
+  }
+};
+
+
+// Define a new point representation for < x, y, z, curvature >
+class MyPointRepresentation : public pcl::PointRepresentation <PointNormalT>
+{
+  using pcl::PointRepresentation<PointNormalT>::nr_dimensions_;
+public:
+  MyPointRepresentation ()
+  {
+    // Define the number of dimensions
+    nr_dimensions_ = 4;
+  }
+
+  // Override the copyToFloatArray method to define our feature vector
+  virtual void copyToFloatArray (const PointNormalT &p, float * out) const
+  {
+    // < x, y, z, curvature >
+    out[0] = p.x;
+    out[1] = p.y;
+    out[2] = p.z;
+    out[3] = p.curvature;
+  }
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+/** \brief Display source and target on the first viewport of the visualizer
+ *
+ */
+void showCloudsLeft(const PointCloud::Ptr cloud_target, const PointCloud::Ptr cloud_source)
+{
+  p->removePointCloud ("vp1_target");
+  p->removePointCloud ("vp1_source");
+
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> tgt_h (cloud_target, 0, 255, 0);
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> src_h (cloud_source, 255, 0, 0);
+  p->addPointCloud (cloud_target, tgt_h, "vp1_target", vp_1);
+  p->addPointCloud (cloud_source, src_h, "vp1_source", vp_1);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+/** \brief Display source and target on the second viewport of the visualizer
+ *
+ */
+void showCloudsRight(const PointCloud::Ptr cloud_target, const PointCloud::Ptr cloud_source)
+{
+  p->removePointCloud ("vp2_target");
+  p->removePointCloud ("vp2_source");
+
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> tgt_h (cloud_target, 0, 255, 0);
+  pcl::visualization::PointCloudColorHandlerCustom<PointT> src_h (cloud_source, 255, 0, 0);
+  p->addPointCloud (cloud_target, tgt_h, "vp2_target", vp_2);
+  p->addPointCloud (cloud_source, src_h, "vp2_source", vp_2);
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+/** \brief Align a pair of PointCloud datasets and return the result
+  * \param cloud_src the source PointCloud
+  * \param cloud_tgt the target PointCloud
+  * \param output the resultant aligned source PointCloud
+  * \param final_transform the resultant transform between source and target
+  */
+void pairAlign (const PointCloud::Ptr cloud_src, const PointCloud::Ptr cloud_tgt, PointCloud::Ptr output, Eigen::Matrix4f &final_transform, bool downsample = false)
+{
+  //
+  // Downsample for consistency and speed
+  // \note enable this for large datasets
+  PointCloud::Ptr src (new PointCloud);
+  PointCloud::Ptr tgt (new PointCloud);
+  pcl::VoxelGrid<PointT> grid;
+  if (downsample)
+  {
+    double leaf = 1.2;
+    grid.setLeafSize (leaf, leaf, leaf);
+    grid.setInputCloud (cloud_src);
+    grid.filter (*src);
+
+    grid.setInputCloud (cloud_tgt);
+    grid.filter (*tgt);
+  }
+  else
+  {
+    src = cloud_src;
+    tgt = cloud_tgt;
+  }
+
+
+  // Compute surface normals and curvature
+  PointCloudWithNormals::Ptr points_with_normals_src (new PointCloudWithNormals);
+  PointCloudWithNormals::Ptr points_with_normals_tgt (new PointCloudWithNormals);
+
+  pcl::NormalEstimation<PointT, PointNormalT> norm_est;
+  pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ> ());
+  norm_est.setSearchMethod (tree);
+  norm_est.setKSearch (30);
+
+  norm_est.setInputCloud (src);
+  norm_est.compute (*points_with_normals_src);
+  pcl::copyPointCloud (*src, *points_with_normals_src);
+
+  norm_est.setInputCloud (tgt);
+  norm_est.compute (*points_with_normals_tgt);
+  pcl::copyPointCloud (*tgt, *points_with_normals_tgt);
+
+  //
+  // Instantiate our custom point representation (defined above) ...
+  MyPointRepresentation point_representation;
+  // ... and weight the 'curvature' dimension so that it is balanced against x, y, and z
+  float alpha[4] = {1.0, 1.0, 1.0, 1.0};
+  point_representation.setRescaleValues (alpha);
+
+  //
+  // Align
+  pcl::IterativeClosestPointNonLinear<PointNormalT, PointNormalT> reg;
+  reg.setTransformationEpsilon (1e-8);
+  // Set the maximum distance between two correspondences (src<->tgt) to 3m
+  // Note: adjust this based on the size of your datasets
+  reg.setMaxCorrespondenceDistance (5.0);
+  // Set the point representation
+  reg.setPointRepresentation (boost::make_shared<const MyPointRepresentation> (point_representation));
+
+  reg.setInputSource (points_with_normals_src);
+  reg.setInputTarget (points_with_normals_tgt);
+
+
+
+  //
+  // Run the same optimization in a loop and visualize the results
+  Eigen::Matrix4f Ti = Eigen::Matrix4f::Identity (), prev, targetToSource;
+  PointCloudWithNormals::Ptr reg_result (new PointCloudWithNormals);
+
+  reg.setMaximumIterations (100);
+  reg.setInputSource (points_with_normals_src);
+  reg.align (*reg_result);
+
+  // Get the transformation from target to source
+  Ti = reg.getFinalTransformation ();
+  targetToSource = Ti.inverse();
+
+  //
+  // Transform target back in source frame
+  pcl::transformPointCloud (*cloud_tgt, *output, targetToSource);
+
+
+  //add the source to the transformed target
+  //*output += *cloud_src;
+
+  final_transform = targetToSource;
+ }
+
+
+
+
+
 
 void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
+
 
 // Align a rigid object to a scene with clutter and occlusions
 int main (int argc, char **argv)
@@ -45,6 +222,11 @@ int main (int argc, char **argv)
   ros::NodeHandle node;
 
   ros::Subscriber sub_velo  = node.subscribe("/velodyne_points", 1, callbackVelo);
+
+  // Create a PCLVisualizer object
+  p = new pcl::visualization::PCLVisualizer (argc, argv, "Pairwise Incremental Registration example");
+  p->createViewPort (0.0, 0, 0.5, 1.0, vp_1);
+  p->createViewPort (0.5, 0, 1.0, 1.0, vp_2);
 
   ros::spin();
   return 0;
@@ -57,7 +239,7 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 
 
   // Convert msg to pointcloud
-  PointCloudPT cloud;
+  PointCloud cloud;
 
   pcl::fromROSMsg (*cloud_msg, cloud);
   pc_current_ = cloud.makeShared();
@@ -66,146 +248,52 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
   {
     pc_prev_ = pc_current_;
     is_initialized_ = true;
+
+    PCL_INFO ("Press q to begin the registration.\n");
+    p-> spin();
     return;
   }
 
 
 
-  // Point clouds
-  PointCloudPT::Ptr object = pc_current_;
-  PointCloudPT::Ptr scene = pc_prev_;
-
-  PointCloudNT::Ptr object_aligned (new PointCloudNT);
-  PointCloudNT::Ptr object_normals (new PointCloudNT);
-  PointCloudNT::Ptr scene_normals (new PointCloudNT);
-  FeatureCloudT::Ptr object_features (new FeatureCloudT);
-  FeatureCloudT::Ptr scene_features (new FeatureCloudT);
-
-  printf("Cloud1 size: %lu, Cloud2 size: %lu\n\n", object->points.size(), scene->points.size());
-
-  // Filter points above and below a certain point (ground and sky)
+  //Filter inputs
   pcl::console::print_highlight ("Filtering z...\n");
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setFilterFieldName ("z");
-  pass.setFilterLimits (-0.8, 4);
+  pass.setFilterLimits (-0.8, 3);
   //pass.setFilterLimitsNegative (true);
-  pass.setInputCloud (object);
-  pass.filter (*object);
-  pass.setInputCloud (scene);
-  pass.filter (*scene);
+  pass.setInputCloud (pc_prev_);
+  pass.filter (*pc_prev_);
+  pass.setInputCloud (pc_current_);
+  pass.filter (*pc_current_);
 
 
 
-  // Downsample
-  pcl::console::print_highlight ("Downsampling...\n");
-  pcl::VoxelGrid<PointPT> grid;
-  const float leaf = 0.1f;
-  grid.setLeafSize (leaf, leaf, leaf);
-  grid.setInputCloud (object);
-  grid.filter (*object);
-  grid.setInputCloud (scene);
-  grid.filter (*scene);
-
-  printf("Cloud1 size: %lu, Cloud2 size: %lu\n\n", object->points.size(), scene->points.size());
+  // Align
+  PointCloud::Ptr result (new PointCloud);
+  Eigen::Matrix4f GlobalTransform = Eigen::Matrix4f::Identity (), pairTransform;
 
 
+  // Add visualization data
+  showCloudsLeft(pc_prev_, pc_current_);
 
-  // Estimate normals for scene and object
-  pcl::console::print_highlight ("Estimating scene normals...\n");
-  pcl::NormalEstimationOMP<PointPT,PointNT> nest;
-  //nest.setKSearch (10);
-  nest.setRadiusSearch (1.0);
-  {
-    pcl::ScopeTime t("Normal Estimation for scene");
-    nest.setInputCloud (scene);
-    nest.compute (*scene_normals);
-
-  }
-  {
-    pcl::ScopeTime t("Normal Estimation for object");
-    nest.setInputCloud (object);
-    nest.compute (*object_normals);
-  }
-
-  printf("Cloud1 size: %lu, Cloud2 size: %lu\n\n", object_normals->points.size(), scene_normals->points.size());
-
-
-
-  // Estimate features
-  pcl::console::print_highlight ("Estimating features...\n");
-  FeatureEstimationT fest;
-  fest.setRadiusSearch (0.5);
-  {
-    pcl::ScopeTime t("Feature Estimation for scene");
-    fest.setInputCloud (scene_normals);
-    fest.setInputNormals (scene_normals);
-    fest.compute (*scene_features);
-  }
-  {
-    pcl::ScopeTime t("Feature Estimation for object");
-    fest.setInputCloud (object_normals);
-    fest.setInputNormals (object_normals);
-    fest.compute (*object_features);
-  }
-
-  printf("Cloud1 size: %lu, Cloud2 size: %lu\n\n", object_features->points.size(), object_features->points.size());
-
-
-  // Perform alignment
-  pcl::console::print_highlight ("Starting alignment...\n");
-  pcl::SampleConsensusPrerejective<PointNT,PointNT,FeatureT> align;
-  align.setInputSource (object_normals);
-  align.setSourceFeatures (object_features);
-  align.setInputTarget (scene_normals);
-  align.setTargetFeatures (scene_features);
-  align.setMaximumIterations (10000); // Number of RANSAC iterations
-  align.setNumberOfSamples (3); // Number of points to sample for generating/prerejecting a pose
-  align.setCorrespondenceRandomness (10); // Number of nearest features to use
-  align.setSimilarityThreshold (0.7f); // Polygonal edge length similarity threshold
-  align.setMaxCorrespondenceDistance (2.5f * leaf); // Inlier threshold
-  align.setInlierFraction (0.25f); // Required inlier fraction for accepting a pose hypothesis
+  PointCloud::Ptr temp (new PointCloud);
+  //PCL_INFO ("Aligning %s (%d) with %s (%d).\n", data[i-1].f_name.c_str (), source->points.size (), data[i].f_name.c_str (), target->points.size ());
   {
     pcl::ScopeTime t("Alignment");
-    align.align (*object_aligned);
+    pairAlign (pc_prev_, pc_current_, temp, pairTransform, true);
   }
 
-  if (align.hasConverged ())
-  {
-    // Print results
-    printf ("\n");
-    Eigen::Matrix4f transformation = align.getFinalTransformation ();
-    pcl::console::print_info ("    | %6.3f %6.3f %6.3f | \n", transformation (0,0), transformation (0,1), transformation (0,2));
-    pcl::console::print_info ("R = | %6.3f %6.3f %6.3f | \n", transformation (1,0), transformation (1,1), transformation (1,2));
-    pcl::console::print_info ("    | %6.3f %6.3f %6.3f | \n", transformation (2,0), transformation (2,1), transformation (2,2));
-    pcl::console::print_info ("\n");
-    pcl::console::print_info ("t = < %0.3f, %0.3f, %0.3f >\n", transformation (0,3), transformation (1,3), transformation (2,3));
-    pcl::console::print_info ("\n");
-    pcl::console::print_info ("Inliers: %i/%i\n", align.getInliers ().size (), object->size ());
+  showCloudsRight(pc_prev_, temp);
 
-    // Show alignment
-    pcl::visualization::PCLVisualizer visu("Alignment");
-    visu.addPointCloud (scene_normals, ColorHandlerNT (scene_normals, 0.0, 255.0, 0.0), "scene");
-    visu.addPointCloud (object_aligned, ColorHandlerNT (object_aligned, 0.0, 0.0, 255.0), "object_aligned");
-    visu.spin ();
-  }
-  else
-  {
-    pcl::console::print_error ("Alignment failed!\n");
 
-    // Show clouds
-    pcl::visualization::PCLVisualizer visu("Inputs");
-
-    visu.addPointCloudNormals<PointPT, PointNT>(scene, scene_normals, 2, 0.2, "scene_w_normals");
-    visu.addPointCloudNormals<PointPT, PointNT>(object, object_normals, 2, 0.2, "object_w_normals");
-
-    visu.addPointCloud<PointPT> (scene, ColorHandlerPT(scene, 0.0, 255.0, 0.0),  "scene");
-    visu.addPointCloud<PointPT> (object,ColorHandlerPT(object, 255.0, 0.0, 0.0), "object");
-
-    visu.spin ();
-  }
+  std::cout << pairTransform << "\n";
 
   // Update clouds
   pc_prev_ = pc_current_;
   is_done_ = true;
+
+  while(ros::ok())
+    p->spinOnce();
 
 }
