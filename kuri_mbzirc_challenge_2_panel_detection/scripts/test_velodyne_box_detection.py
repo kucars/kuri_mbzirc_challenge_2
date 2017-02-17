@@ -55,16 +55,20 @@ class mbzirc_c2_auto():
     rospy.loginfo("Sending start command")
     goal = BoxPositionGoal()
     goal.request = goal.REQUEST_START
+    goal.range_max = 30
+    goal.range_max = 60
+    goal.angle_min = -pi/2
+    goal.angle_max = pi/2
     self.execute(goal)
     rospy.loginfo("Started")
 
-    time.sleep(30)
+    #time.sleep(30)
 
-    rospy.loginfo("Sending stop command")
-    goal = BoxPositionGoal()
-    goal.request = goal.REQUEST_STOP
-    self.execute(goal)
-    rospy.loginfo("Stopped")
+    #rospy.loginfo("Sending stop command")
+    #goal = BoxPositionGoal()
+    #goal.request = goal.REQUEST_STOP
+    #self.execute(goal)
+    #rospy.loginfo("Stopped")
 
 
     rospy.signal_shutdown("Complete")

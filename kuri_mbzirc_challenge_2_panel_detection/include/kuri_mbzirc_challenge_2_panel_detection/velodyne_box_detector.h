@@ -120,6 +120,7 @@ protected:
   // Update confidence based on: 0.5 + base*exp(-lambda*distace)
   double confidence_update_base_;\
   double confidence_update_lambda_;
+  double max_match_distance_;
 
   std::vector<BoxCluster> cluster_list;
   PcCloudPtr pc_current_;

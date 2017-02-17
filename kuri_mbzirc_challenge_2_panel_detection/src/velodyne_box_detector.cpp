@@ -45,6 +45,7 @@ BoxPositionActionHandler::BoxPositionActionHandler(std::string name) :
   // Selected so that total confidence is 0.8 @ 5m and 0.55 @ 60m
   confidence_update_base_ = 0.353;
   confidence_update_lambda_ = 0.0325;
+  max_match_distance_ = 3.0;
 
   pub_wall  = nh_.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
   pub_lines = nh_.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
@@ -142,6 +143,13 @@ PcCloudPtr BoxPositionActionHandler::filterCloudRangeAngle(PcCloudPtr cloud_ptr,
   for (int i=0; i < cloud_ptr->points.size(); i++)
   {
     PcPoint p = cloud_ptr->points[i];
+
+    // Ignore points high above velodyne or on the floor
+    if (p.z > 1.8 || p.z < 1.2)
+    {
+      continue;
+    }
+
     double r = p.x*p.x + p.y*p.y;
     if (r > laser_max_range || r < laser_min_range)
       continue;
@@ -283,39 +291,43 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   std::vector<geometry_msgs::Pose> poses = getPanelPose(pc_vector);
 
   // Create vector to track updates
+  /*
   std::vector<bool> is_updated_prev;
   for (int ib=0; ib < pc_vector.size(); ib++)
     is_updated_prev.push_back(false);
-
-  /*
-  std::vector<bool> is_inserted_current;
-  for (int ib=0; ib < pc_vector.size(); ib++)
-    is_inserted_current.push_back(false);
   */
 
+  int pc_size = pc_vector.size();
+  std::vector<bool> is_inserted_current;
+  for (int ib=0; ib < pc_size; ib++)
+  {
+    is_inserted_current.push_back(false);
+  }
+
 
   //
-  // Use current information to update past data
+  // Match previous data with current data
   //
-  for (int i_curr=0; i_curr<pc_vector.size(); i_curr++)
+  for (int i_prev=0; i_prev<cluster_list.size(); i_prev++)
   {
-    BoxCluster b1;
-    b1.point_cloud = pc_vector[i_curr];
-    b1.pose = poses[i_curr];
-    b1.confidence.setProbability(0.5);
+    BoxCluster b1 = cluster_list[i_prev];
 
     // Find closest box
     double r_min = 1/.0;
     int idx = -1;
 
-    for (int i_prev = 0; i_prev < cluster_list.size(); i_prev++)
+    for (int i_curr=0; i_curr<pc_vector.size(); i_curr++)
     {
-      BoxCluster b2 = cluster_list[i_prev];
+      BoxCluster b2;
+      b2.point_cloud = pc_vector[i_curr];
+      b2.pose = poses[i_curr];
+      b2.confidence.setProbability(0.5);
+
       double r = computeDistance(b1.pose, b2.pose);
-      if (r < r_min)
+      if (r < r_min && r < max_match_distance_)
       {
         r_min = r;
-        idx = i_prev;
+        idx = i_curr;
       }
     }
 
@@ -323,35 +335,47 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
     if (idx > -1)
     {
       // Match found, update it
-      cluster_list[idx].point_cloud = b1.point_cloud;
-      cluster_list[idx].pose = b1.pose;
+      cluster_list[i_prev].point_cloud = pc_vector[idx];
+      cluster_list[i_prev].pose = poses[idx];
 
-      double dist = computeDistance(b1.pose); //distance from origin
+      double dist = computeDistance(cluster_list[idx].pose); //distance from origin
       double p = 0.5 + confidence_update_base_*exp(-confidence_update_lambda_*dist);
 
-      cluster_list[idx].confidence.updateProbability(p);
-      is_updated_prev[idx] = true;
+      cluster_list[i_prev].confidence.updateProbability(p);
+      is_inserted_current[idx] = true;
     }
+
+
     else
     {
-      // Match not found. Add to list
-      cluster_list.push_back(b1);
+      // Match not found. Decrease confidence
+      // Highly confident there is nothing if it's not detected up close
+      double dist = computeDistance(b1.pose); //distance from origin
+      double p = 0.5 - confidence_update_base_*exp(-confidence_update_lambda_*dist);
+
+      cluster_list[i_prev].confidence.updateProbability(p);
     }
   }
 
 
-  // Check if we updated all previous past data. If not, decrease their confidence
-  for (int i_prev=0; i_prev<cluster_list.size(); i_prev++)
+  /*
+  //
+  // If all the new data is not accounted for, add it to the list
+  //
+  for (int i_curr=0; i_curr < pc_vector.size(); i_curr++)
   {
-    if (is_updated_prev[i_prev])
+    if (is_inserted_current[i_curr])
       continue;
 
-    // Highly confident there is nothing if it's not detected up close
-    double dist = computeDistance(cluster_list[i_prev].pose); //distance from origin
-    double p = 0.5 - confidence_update_base_*exp(-confidence_update_lambda_*dist);
+    BoxCluster b1;
+    b1.point_cloud = pc_vector[i_curr];
+    b1.pose = poses[i_curr];
+    b1.confidence.setProbability(0.5);
 
-    cluster_list[i_prev].confidence.updateProbability(p);
+    cluster_list.push_back(b1);
   }
+  */
+
 
 
   // Delete any entries below a threshold
@@ -367,40 +391,6 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
           i++;
       }
   }
-
-
-  /*
-  PcCloudPtr cloud_filtered = pc_current_;
-
-  // Get clusters
-  PcCloudPtrList pc_vector = extractBoxClusters(cloud_filtered);
-
-  if (pc_vector.size() == 0)
-  {
-    std::cout << "Could not find panel cluster.\n";
-    return;
-  }
-
-  // Publish cluster clouds
-  for (int i=0; i<pc_vector.size(); i++)
-  {
-    sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*pc_vector[i], cloud_cluster_msg);
-    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
-    cloud_cluster_msg.header.stamp = ros::Time::now();
-    pub_wall.publish(cloud_cluster_msg);
-
-    if (pc_vector.size() > 1)
-      usleep(200*1000);
-  }
-
-  if (pc_vector.size() > 1)
-  {
-    std::cout << "Found multiple panel clusters. Using the first one.\n";
-  }
-
-  PcCloudPtr cluster_cloud = pc_vector[0];
-  */
 
   // Display clouds
   drawClusters(cloud_msg->header.frame_id);
@@ -514,27 +504,29 @@ void BoxPositionActionHandler::drawPoints(std::vector<geometry_msgs::Point> poin
 
 void BoxPositionActionHandler::drawClusters(std::string frame_id)
 {
+  PcCloud final_cloud;
+
   printf("\nCluster | Points | Distance |  Angle  | Confidence\n");
   for (int i=0; i<cluster_list.size(); i++)
   {
     BoxCluster b = cluster_list[i];
-    printf("  %3d     %4lu       %2.1f     %3.1f      %2.1f\n",
+    final_cloud += *b.point_cloud;
+
+    printf("  %3d     %4lu    \t%2.1f \t%4.1f \t%2.1f\n",
            i,
            b.point_cloud->points.size(),
            computeDistance(b.pose),
-           RAD2DEG( atan2(b.pose.position.x, b.pose.position.y) ),
+           RAD2DEG( atan2(-b.pose.position.y, b.pose.position.x) ),
            b.confidence.getProbability()*100);
-
-
-    sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*cluster_list[i].point_cloud, cloud_cluster_msg);
-    cloud_cluster_msg.header.frame_id = frame_id;
-    cloud_cluster_msg.header.stamp = ros::Time::now();
-    pub_wall.publish(cloud_cluster_msg);
-
-    if (cluster_list.size() > 1)
-      usleep(200*1000);
   }
+
+  //Publish message
+
+  sensor_msgs::PointCloud2 cloud_cluster_msg;
+  pcl::toROSMsg(final_cloud, cloud_cluster_msg);
+  cloud_cluster_msg.header.frame_id = frame_id;
+  cloud_cluster_msg.header.stamp = ros::Time::now();
+  pub_wall.publish(cloud_cluster_msg);
 }
 
 PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)
@@ -547,9 +539,9 @@ PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)
 
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<PcPoint> ec;
-  ec.setClusterTolerance (0.5); // up to 50cm btw points - big since we're sure the panel is far from other obstacles
+  ec.setClusterTolerance (1.0); // up to 100cm btw points - big since we're sure the panel is far from other obstacles
   ec.setMinClusterSize (3);     // at least 3 points
-  ec.setMaxClusterSize (1000);
+  ec.setMaxClusterSize (5000);
   ec.setSearchMethod (tree);
   ec.setInputCloud (cloud_ptr);
   ec.extract (cluster_indices);
