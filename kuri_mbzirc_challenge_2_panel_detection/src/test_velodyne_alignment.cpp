@@ -231,11 +231,14 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
   pc_prev_ = pc_current_;
   //is_done_ = true;
 
+  /*
   ros::Duration d(0.05);
   for (int i=0; i<10; i++)
   {
     p->spinOnce();
     d.sleep();
   }
+  */
+  p->spinOnce();
 
 }

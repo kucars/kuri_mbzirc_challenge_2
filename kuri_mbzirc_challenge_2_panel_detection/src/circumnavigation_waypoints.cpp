@@ -113,19 +113,6 @@ public:
 typedef velodyne_pointcloud::PointXYZIR VPoint;
 typedef pcl::PointCloud<VPoint> VPointCloud;
 
-struct HoughLine
-{
-    double r;
-    double angle;
-    int votes;
-
-    bool operator<(const HoughLine & other) const
-    {
-        return (votes > other.votes);
-    }
-};
-
-
 
 // ======
 // Prototypes
@@ -133,11 +120,8 @@ struct HoughLine
 void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners);
 void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector);
 
-void drawHoughLine(std::vector<HoughLine> lines, std::string frame_id);
 void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
-std::vector<geometry_msgs::Point> findCorners(std::vector<HoughLine> lines);
 std::vector<double> generateRange(double start, double end, double step);
-std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hough);
 
 void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg);
 void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
@@ -149,7 +133,6 @@ void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
 ros::Subscriber sub_odom;
 ros::Subscriber sub_scan;
 ros::Publisher  pub_wall;
-ros::Publisher  pub_lines;
 ros::Publisher  pub_points;
 ros::Publisher  pub_poses;
 tf::TransformListener *tf_listener;
@@ -171,7 +154,6 @@ int main(int argc, char **argv)
   action_handler = new PanelPositionActionHandler(actionlib_topic);
 
   pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
-  pub_lines = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
   pub_points= node.advertise<visualization_msgs::Marker>("/explore/points", 10);
   pub_poses = node.advertise<geometry_msgs::PoseArray>("/explore/poses", 10);
 
@@ -410,24 +392,6 @@ void callbackScan(const sensor_msgs::LaserScan::ConstPtr& scan_msg)
   pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud = pc_vector_clustered[0];
 
 
-
-
-  /*
-  // Hough transform
-  std::vector<HoughLine> lines = houghTransform(cluster_cloud);
-
-  // Draw Hough lines
-  drawHoughLine(lines, scan_msg->header.frame_id);
-
-  // Get intersecting points
-  std::vector<geometry_msgs::Point> corners;
-  corners = findCorners(lines);
-
-  // Draw points
-  drawPoints(corners, scan_msg->header.frame_id);
-  */
-
-
   // Transform cluster to world frame
   pcl::PointCloud<pcl::PointXYZ>::Ptr tf_cloud (new pcl::PointCloud<pcl::PointXYZ>);
 
@@ -532,46 +496,6 @@ void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vec
   }
 }
 
-void drawHoughLine(std::vector<HoughLine> lines, std::string frame_id)
-{
-  visualization_msgs::Marker marker_msg;
-  marker_msg.header.frame_id = frame_id;
-  marker_msg.header.stamp = ros::Time::now();
-  marker_msg.type = marker_msg.LINE_LIST;
-  marker_msg.pose.orientation.w = 1;
-
-  marker_msg.scale.x = 0.01;
-  marker_msg.color.a = 1.0;
-  marker_msg.color.b = 1.0;
-
-
-  double arc = 75*DEG2RAD;
-  for (int i=0; i<lines.size(); i++)
-  {
-    double r = lines[i].r;
-    double t = lines[i].angle;
-    double r_new = r/cos(arc);
-
-    double x1, x2, y1, y2;
-    x1 = r_new*cos(t+arc);
-    y1 = r_new*sin(t+arc);
-    x2 = r_new*cos(t-arc);
-    y2 = r_new*sin(t-arc);
-
-    geometry_msgs::Point p1;
-    p1.x = x1;
-    p1.y = y1;
-    marker_msg.points.push_back(p1);
-
-    geometry_msgs::Point p2;
-    p2.x = x2;
-    p2.y = y2;
-    marker_msg.points.push_back(p2);
-  }
-
-  pub_lines.publish(marker_msg);
-}
-
 void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id)
 {
   // Publish
@@ -588,63 +512,6 @@ void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id)
   marker_msg.points = points;
 
   pub_points.publish(marker_msg);
-}
-
-std::vector<geometry_msgs::Point> findCorners(std::vector<HoughLine> lines)
-{
-  std::vector<HoughLine> line_pairs;
-
-  // Get pairs
-  for (int i=0; i<lines.size()-1; i++)
-  {
-    double min_angle = 80*DEG2RAD;
-    double max_angle = 100*DEG2RAD;
-
-    for (int j=i+1; j<lines.size(); j++)
-    {
-      double t1 = lines[i].angle;
-      double t2 = lines[j].angle;
-
-      double angle = t1-t2;
-      if (angle > M_PI)
-        angle -= M_PI;
-      if (angle < -M_PI)
-        angle += M_PI;
-      angle = fabs(angle);
-
-      if (min_angle <= angle && angle <= max_angle)
-      {
-        line_pairs.push_back(lines[i]);
-        line_pairs.push_back(lines[j]);
-      }
-    }
-  } //get pairs
-
-  // Find corners
-  std::vector<geometry_msgs::Point> corners;
-  for (int i=0; i<line_pairs.size(); i+=2)
-  {
-    double r1, r2, t1, t2, m1, m2, c1, c2, x, y;
-    r1 = line_pairs[i].r;
-    t1 = line_pairs[i].angle;
-    r2 = line_pairs[i+1].r;
-    t2 = line_pairs[i+1].angle;
-
-    m1 = -1/tan(t1);
-    c1 = r1 / sin(t1);
-    m2 = -1/tan(t2);
-    c2 = r2 / sin(t2);
-
-    x = (c2-c1)/(m1-m2);
-    y = m1*x + c1;
-
-    geometry_msgs::Point p;
-    p.x = x;
-    p.y = y;
-    corners.push_back(p);
-  }
-
-  return corners;
 }
 
 std::vector<double> generateRange(double start, double end, double step)
@@ -693,120 +560,4 @@ void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector
 
     pc_vector.push_back(cloud_cluster);
   }
-}
-
-std::vector<HoughLine> houghTransform(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_hough)
-{
-  double hough_range_res = 0.1;
-  double hough_angle_res = 5*DEG2RAD;
-  int hough_threshold = 15;
-
-  // Get max r to set up rhos
-  double r_max = 0;
-  for (int i = 0; i< cloud_hough->points.size(); i++)
-  {
-    pcl::PointXYZ p = cloud_hough->points[i];
-    double r = p.x*p.x + p.y*p.y;
-
-    if (r > r_max)
-      r_max = r;
-  }
-  r_max = sqrt(r_max);
-
-  // Generate rho, theta and vote arrays
-  std::vector<double> rhos, thetas;
-  rhos = generateRange(0, r_max, hough_range_res);
-  thetas = generateRange(-M_PI, M_PI, hough_angle_res);
-
-  int sizeR = rhos.size();
-  int sizeT = thetas.size();
-  int *votes = (int*)calloc(sizeR * sizeT, sizeof(int));
-
-
-  // Analyze each point (transform)
-  for (int i = 0; i< cloud_hough->points.size(); i++)
-  {
-    pcl::PointXYZ p = cloud_hough->points[i];
-
-    for (int i_t = 0; i_t < sizeT; i_t++)
-    {
-      double r = p.x*cos(thetas[i_t]) + p.y*sin(thetas[i_t]);
-      if (r < 0)
-        continue;
-
-      r = hough_range_res*round(r/hough_range_res); // round to nearest value of rho
-      int i_r = r / hough_range_res; // find corresponding index of rho
-
-      votes[i_r*sizeT + i_t]++;
-    }
-  }
-
-  /*
-  // Find max votes
-  int v_max = 0;
-  for (int i_r=0; i_r < sizeR; i_r++)
-  {
-    for (int i_t=0; i_t<sizeT; i_t++)
-    {
-      if (votes[i_r*sizeT + i_t] > v_max)
-        v_max = votes[i_r*sizeT + i_t];
-    }
-  }
-  */
-
-  std::vector<HoughLine> lines_out;
-  for (int i_r=0; i_r < sizeR; i_r++)
-  {
-    for (int i_t=0; i_t<sizeT; i_t++)
-    {
-      if (votes[i_r*sizeT + i_t] >= hough_threshold)
-      {
-        bool isMaxima = true;
-
-        for (int k_r=i_r-2; k_r <= i_r+2; k_r++)
-        {
-          if (!isMaxima)
-            break;
-
-          if (k_r < 0 || k_r >= sizeR)
-            continue;
-
-          for (int k_t=i_t-2; k_t<=i_t+2; k_t++)
-          {
-            if (i_t == k_t && i_r == k_r)
-              continue;
-
-            if (k_t < 0 || k_t > sizeT)
-              continue;
-
-            if (votes[i_r*sizeT + i_t] < votes[k_r*sizeT + k_t])
-            {
-              isMaxima = false;
-              break;
-            }
-          } //for k_t
-        } //for k_r
-
-        if (isMaxima)
-        {
-            HoughLine h;
-            h.r = rhos[i_r];
-            h.angle = thetas[i_t];
-            h.votes = votes[i_r*sizeT + i_t];
-            lines_out.push_back(h);
-        }
-
-
-      } //if votes > hough_threshold
-    } // for i_t
-  } //for i_r
-
-
-  // Sort in descending order of votes
-  sort(lines_out.begin(), lines_out.end());
-
-  // Clean up
-  free(votes);
-
-  return lines_out;
 }
