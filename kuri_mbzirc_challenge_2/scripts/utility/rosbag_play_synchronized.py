@@ -10,7 +10,7 @@ import sys
 
 import rosbag
 
-fileprefix = ['diagnostics_', 'kinect_', 'velodyne_']
+fileprefix = ['diagnostics_', 'kinect_', 'velodyne_', 'scan_']
 
 parser = ArgumentParser(description='Plot GPS and odometry data.')
 parser.add_argument('folder', type=str, help='Directory to search for rosbag files')
@@ -115,7 +115,7 @@ files_timestamped = [[False for x in range(w)] for y in range(h)]
 # NO ID SPECIFIED
 if (input_id < 0):
     # Print all files
-    print('ID\tTimestamp\t\tDiag\tKinect\tVelo\tDuration (sec)')
+    print('ID\tTimestamp\t\tDiag\tKinect\tVelo\tScan\tDuration (sec)')
 
     for i in range(0, len(timestamps)):
         t = timestamps[i]

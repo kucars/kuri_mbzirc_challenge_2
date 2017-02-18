@@ -1,8 +1,10 @@
 <?xml version="1.0"?>
 
 <launch>
-  <arg name="record_velodyne" default="true" />
-  <arg name="record_kinect" default="true" />
+  <arg name="record_kinect" default="false" />
+  <arg name="record_scan" default="false" />
+  <arg name="record_velodyne" default="false" />
+
 
  <node pkg="rosbag" type="record" name="rosbag_record_cam"
        if="$(arg record_kinect)"
@@ -17,9 +19,15 @@
 
  <node pkg="rosbag" type="record" name="rosbag_record_velodyne"
        if="$(arg record_velodyne)"
-       args="-o $(find kuri_mbzirc_challenge_2)/rosbag/velodyne 
+       args="-o $(find kuri_mbzirc_challenge_2)/rosbag/velodyne
         /velodyne_points"
         />
+
+  <node pkg="rosbag" type="record" name="rosbag_record_scan"
+        if="$(arg record_scan)"
+        args="-o $(find kuri_mbzirc_challenge_2)/rosbag/scan
+         /scan"
+         />
 
  <node pkg="rosbag" type="record" name="rosbag_record_diag"
        args="-o $(find kuri_mbzirc_challenge_2)/rosbag/diagnostics
