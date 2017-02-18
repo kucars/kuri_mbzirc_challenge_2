@@ -8,6 +8,7 @@ Panels:
         - /Status1
         - /Grid1
         - /Velodyne1/Autocompute Value Bounds1
+        - /Odometry1
       Splitter Ratio: 0.5
     Tree Height: 436
   - Class: rviz/Selection
@@ -53,8 +54,8 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 21.3411
-        Min Value: -1.85636
+        Max Value: 19.1516
+        Min Value: -2.41185
         Value: true
       Axis: Z
       Channel Name: intensity
@@ -220,10 +221,20 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
+    - Angle Tolerance: 0.1
+      Class: rviz/Odometry
+      Color: 255; 255; 255
+      Enabled: true
+      Keep: 100
+      Length: 1
+      Name: Odometry
+      Position Tolerance: 0.1
+      Topic: /odometry/filtered
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: velodyne
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -244,22 +255,22 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 157.523
+      Distance: 65.6687
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 5.32723
-        Y: -19.4804
+        X: 3.8825
+        Y: -8.82419
         Z: -14.3704
       Name: Current View
       Near Clip Distance: 0.01
       Pitch: 1.5698
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.1554
+      Yaw: 3.89041
     Saved: ~
 Window Geometry:
   Camera:

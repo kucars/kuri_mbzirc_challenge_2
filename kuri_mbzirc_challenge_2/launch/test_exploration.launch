@@ -2,7 +2,7 @@
 
 <launch>
   <!-- Record data -->
-  <include file="$(find kuri_mbzirc_challenge_2)/launch/husky.launch">
+  <include file="$(find kuri_mbzirc_challenge_2)/launch/record_rosbag.launch">
     <arg name="record_velodyne" value="true" />
     <arg name="record_kinect"   value="false"/>
   </include>
