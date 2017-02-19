@@ -145,7 +145,7 @@ PcCloudPtr BoxPositionActionHandler::filterCloudRangeAngle(PcCloudPtr cloud_ptr,
     PcPoint p = cloud_ptr->points[i];
 
     // Ignore points high above velodyne or on the floor
-    if (p.z > 1.8 || p.z < 1.2)
+    if (p.z > 1.8 || p.z < 0.5)
     {
       continue;
     }
@@ -265,6 +265,29 @@ std::vector<geometry_msgs::Pose> BoxPositionActionHandler::getPanelPose(PcCloudP
 }
 
 
+
+void BoxPositionActionHandler::transformToFrame(PcCloudPtr cloud_in, PcCloudPtr& cloud_out, std::string frame_in, std::string frame_out)
+{
+  // Transform to the more stable odom frame
+  tf::StampedTransform transform;
+  try
+  {
+    tf_listener->lookupTransform(frame_out, frame_in, ros::Time(0), transform);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s",ex.what());
+    ros::Duration(1.0).sleep();
+  }
+
+  Eigen::Matrix4d Ti = pose_conversion::convertStampedTransform2Matrix4d(transform);
+
+
+  // Transform cloud
+  pcl::transformPointCloud (*cloud_in, *cloud_out, Ti);
+}
+
+
 void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 {
   // Convert msg to pointcloud
@@ -273,17 +296,16 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   pcl::fromROSMsg (*cloud_msg, cloud);
   pc_current_ = cloud.makeShared();
 
+  // Transform to odom frame
+  transformToFrame(pc_current_, pc_current_, cloud_msg->header.frame_id, "odom");
 
   if (is_initiatializing_)
   {
     getInitialBoxClusters();
-    drawClusters(cloud_msg->header.frame_id);
+    drawClusters("odom");
 
     return;
   }
-
-  // @todo: Find transform between previous and current data
-  std::cout << "MUST IMPLIMENT TRANSFORM IN velodyne_box_detector\n";
 
 
   PcCloudPtr cloud_filtered = filterCloudRangeAngle(pc_current_, range_min_, range_max_, angle_min_, angle_max_);
@@ -350,8 +372,13 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
     {
       // Match not found. Decrease confidence
       // Highly confident there is nothing if it's not detected up close
+      // Less change if there are few targets left
+      double weight = 1;
+      if (cluster_list.size() < 5)
+        weight = double(cluster_list.size())/15;
+
       double dist = computeDistance(b1.pose); //distance from origin
-      double p = 0.5 - confidence_update_base_*exp(-confidence_update_lambda_*dist);
+      double p = 0.5 - weight*confidence_update_base_*exp(-confidence_update_lambda_*dist);
 
       cluster_list[i_prev].confidence.updateProbability(p);
     }
@@ -383,7 +410,7 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   while ( i < cluster_list.size() )
   {
       double p = cluster_list[i].confidence.getProbability();
-      if ( p < 0.3 )
+      if ( p < 0.3 || !std::isfinite(p) )
       {
           cluster_list.erase( cluster_list.begin() + i );
       } else
@@ -393,7 +420,7 @@ void BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Cons
   }
 
   // Display clouds
-  drawClusters(cloud_msg->header.frame_id);
+  drawClusters("odom");
 
   pc_prev_ = pc_current_;
 }
@@ -539,7 +566,7 @@ PcCloudPtrList BoxPositionActionHandler::getCloudClusters(PcCloudPtr cloud_ptr)
 
   std::vector<pcl::PointIndices> cluster_indices;
   pcl::EuclideanClusterExtraction<PcPoint> ec;
-  ec.setClusterTolerance (1.0); // up to 100cm btw points - big since we're sure the panel is far from other obstacles
+  ec.setClusterTolerance (1.5); // up to 150cm btw points - big since we're sure the panel is far from other obstacles
   ec.setMinClusterSize (3);     // at least 3 points
   ec.setMaxClusterSize (5000);
   ec.setSearchMethod (tree);

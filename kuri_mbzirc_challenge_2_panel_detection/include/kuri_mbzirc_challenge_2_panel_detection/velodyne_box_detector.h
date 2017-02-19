@@ -150,6 +150,7 @@ public:
   std::vector<geometry_msgs::Pose>   getPanelPose(PcCloudPtrList);
   PcCloudPtrList    extractBoxClusters(PcCloudPtr cloud_ptr);
   PcCloudPtr        filterCloudRangeAngle(PcCloudPtr cloud_ptr, double r_min, double r_max, double a_min = -M_PI, double a_max = M_PI);
+  void              transformToFrame(PcCloudPtr cloud_in, PcCloudPtr& cloud_out, std::string frame_in, std::string frame_out);
 
   void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id);
   void drawClusters(std::string frame_id);

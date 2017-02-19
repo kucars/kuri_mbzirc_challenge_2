@@ -1,58 +1,39 @@
 ﻿#include <Eigen/Core>
+
 #include <pcl/point_types.h>
 #include <pcl/point_cloud.h>
-
 #include <pcl/common/time.h>
-
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/filter.h>
 #include <pcl/filters/passthrough.h>
-
-#include <pcl/features/normal_3d.h>
-
 #include <pcl/registration/icp.h>
 #include <pcl/registration/icp_nl.h>
 #include <pcl/registration/transforms.h>
-
 #include <pcl/visualization/pcl_visualizer.h>
 
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <pcl_conversions/pcl_conversions.h>
+#include <tf/transform_listener.h>
+#include "utilities/pose_conversion.h"
 
 
 
 //convenient typedefs
 typedef pcl::PointXYZ PointT;
 typedef pcl::PointCloud<PointT> PointCloud;
-typedef pcl::PointNormal PointNormalT;
-typedef pcl::PointCloud<PointNormalT> PointCloudWithNormals;
 
-// This is a tutorial so we can afford having global variables
+// PCL Visualization
 pcl::visualization::PCLVisualizer *p;
 int vp_1, vp_2;
 
+// State variables
 bool is_initialized_ = false;
 bool is_done_ = false;
 PointCloud::Ptr pc_current_, pc_prev_;
 
+tf::TransformListener* listener;
 
-//convenient structure to handle our pointclouds
-struct PCD
-{
-  PointCloud::Ptr cloud;
-  std::string f_name;
-
-  PCD() : cloud (new PointCloud) {};
-};
-
-struct PCDComparator
-{
-  bool operator () (const PCD& p1, const PCD& p2)
-  {
-    return (p1.f_name < p2.f_name);
-  }
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 /** \brief Display source and target on the first viewport of the visualizer
@@ -148,27 +129,6 @@ void pairAlign (const PointCloud::Ptr cloud_src, const PointCloud::Ptr cloud_tgt
 
 
 
-
-void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
-
-
-// Align a rigid object to a scene with clutter and occlusions
-int main (int argc, char **argv)
-{
-  ros::init(argc, argv, "test_velodyne_alignment");
-  ros::NodeHandle node;
-
-  ros::Subscriber sub_velo  = node.subscribe("/velodyne_points", 1, callbackVelo);
-
-  // Create a PCLVisualizer object
-  p = new pcl::visualization::PCLVisualizer (argc, argv, "Pairwise Incremental Registration example");
-  p->createViewPort (0.0, 0, 0.5, 1.0, vp_1);
-  p->createViewPort (0.5, 0, 1.0, 1.0, vp_2);
-
-  ros::spin();
-  return 0;
-}
-
 void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 {
   if (is_done_)
@@ -180,6 +140,27 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
 
   pcl::fromROSMsg (*cloud_msg, cloud);
   pc_current_ = cloud.makeShared();
+
+
+  // Transform to the more stable odom frame
+  tf::StampedTransform transform;
+  try
+  {
+    listener->lookupTransform("odom", "velodyne", ros::Time(0), transform);
+  }
+  catch (tf::TransformException ex)
+  {
+    ROS_ERROR("%s",ex.what());
+    ros::Duration(1.0).sleep();
+  }
+
+  Eigen::Matrix4d Ti = pose_conversion::convertStampedTransform2Matrix4d(transform);
+
+
+  // Transform cloud
+  //PointCloud::Ptr output (new PointCloud);
+  //pcl::transformPointCloud (*pc_current_, *output, Ti);
+  pcl::transformPointCloud (*pc_current_, *pc_current_, Ti);
 
   if (!is_initialized_)
   {
@@ -193,12 +174,11 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
   }
 
 
-
   //Filter inputs
   pcl::console::print_highlight ("Filtering z...\n");
   pcl::PassThrough<pcl::PointXYZ> pass;
   pass.setFilterFieldName ("z");
-  pass.setFilterLimits (-0.8, 3);
+  pass.setFilterLimits (0.2, 3);
   //pass.setFilterLimitsNegative (true);
   pass.setInputCloud (pc_prev_);
   pass.filter (*pc_prev_);
@@ -231,14 +211,26 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
   pc_prev_ = pc_current_;
   //is_done_ = true;
 
-  /*
-  ros::Duration d(0.05);
-  for (int i=0; i<10; i++)
-  {
-    p->spinOnce();
-    d.sleep();
-  }
-  */
   p->spinOnce();
 
+}
+
+
+
+// Align a rigid object to a scene with clutter and occlusions
+int main (int argc, char **argv)
+{
+  ros::init(argc, argv, "test_velodyne_alignment");
+  ros::NodeHandle node;
+
+  listener = new tf::TransformListener();
+  ros::Subscriber sub_velo  = node.subscribe("/velodyne_points", 1, callbackVelo);
+
+  // Create a PCLVisualizer object
+  p = new pcl::visualization::PCLVisualizer (argc, argv, "Pairwise Incremental Registration example");
+  p->createViewPort (0.0, 0, 0.5, 1.0, vp_1);
+  p->createViewPort (0.5, 0, 1.0, 1.0, vp_2);
+
+  ros::spin();
+  return 0;
 }
