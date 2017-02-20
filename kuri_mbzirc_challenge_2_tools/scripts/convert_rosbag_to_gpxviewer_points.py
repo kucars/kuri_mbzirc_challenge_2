@@ -9,18 +9,19 @@ from geometry_msgs.msg import Quaternion
 import tf
 import time
 
-from yattag import Doc, indent
 
-# Prompt user if scipy is missing.
+
+# Prompt user if yattag is missing.
 try:
-  from scipy import optimize
+  from yattag import Doc, indent
 except ImportError:
-  print("This script requires scipy be available.")
-  print("On Ubuntu: sudo apt-get install python-scipy")
+  print("This script requires yattag.")
+  print("On Ubuntu: sudo pip install yattag")
   exit(1)
 
-parser = ArgumentParser(description='Plot GPS and odometry data.')
+parser = ArgumentParser(description='Plot GPS and odometry data.', prefix_chars='-')
 parser.add_argument('bag', metavar='FILE', type=str, help='input bag file')
+parser.add_argument('-o', '--output', metavar='output', help='Output file. By default is named to "pocotrail.xml"')
 args = parser.parse_args()
 
 bag = rosbag.Bag(args.bag)
@@ -66,7 +67,11 @@ result = indent(
 )
 
 # Save result
-with open('pocotrail.xml', 'w') as file_:
+filename = 'pocotrail.xml'
+if args.output:
+    filename = args.output
+
+with open(filename, 'w') as file_:
     file_.write( result )
 
-print("Saved to pocotrail.xml")
+print("Saved to " + filename)
