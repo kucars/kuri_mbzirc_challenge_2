@@ -4,16 +4,21 @@ project(kuri_mbzirc_challenge_2_tools)
 ## Find catkin macros and libraries
 find_package(catkin REQUIRED COMPONENTS
     roscpp
-    rosbag
-
-    kuri_mbzirc_challenge_2_msgs
-
-    pcl_conversions
-    #pcl_ros
+    tf
+    tf_conversions
 )
+
+find_package(catkin REQUIRED COMPONENTS
+             ${${PROJECT_NAME}_CATKIN_DEPS})
 
 find_package(PCL 1.7 REQUIRED)
 
+###################################
+## catkin specific configuration ##
+###################################
+catkin_package(
+   CATKIN_DEPENDS
+   roscpp
+)
+
 include_directories(include ${catkin_INCLUDE_DIRS})
-include_directories(${PCL_INCLUDE_DIRS})
-link_directories(${PCL_LIBRARY_DIRS})

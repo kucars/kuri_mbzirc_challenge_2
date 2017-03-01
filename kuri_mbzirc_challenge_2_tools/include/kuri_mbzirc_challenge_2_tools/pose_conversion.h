@@ -139,6 +139,23 @@ namespace pose_conversion{
     
     return R;
   }
+
+  static inline Eigen::Matrix4d getTransformationMatrix(geometry_msgs::Quaternion q_in)
+  {
+    Eigen::Matrix4d tf_eigen;
+
+    Eigen::Vector3d T1(0, 0, 0);
+
+    Eigen::Matrix3d R = getRotationMatrix(q_in);
+
+    // Set
+    tf_eigen.setZero ();
+    tf_eigen.block (0, 0, 3, 3) = R;
+    tf_eigen.block (0, 3, 3, 1) = T1;
+    tf_eigen (3, 3) = 1;
+
+    return tf_eigen;
+  }
   
   static inline Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t)
   {
