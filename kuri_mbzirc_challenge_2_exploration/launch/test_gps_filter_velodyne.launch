@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+
+<launch>
+
+
+  <!--- Run Move Base -->
+  <rosparam command="load" file="$(find kuri_mbzirc_challenge_2_exploration)/config/exploration.yaml" ns="kuri_challenge2_exploration"/>
+
+  <!--- husky_waypoint_navigation node -->
+  <node name="test_gps_filter_velodyne" pkg="kuri_mbzirc_challenge_2_exploration" type="test_gps_filter_velodyne" output="screen" />
+
+</launch>

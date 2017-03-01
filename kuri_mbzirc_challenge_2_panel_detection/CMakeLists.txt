@@ -5,6 +5,7 @@ project(kuri_mbzirc_challenge_2_panel_detection)
 find_package(catkin REQUIRED COMPONENTS
   #eigen_conversions
   kuri_mbzirc_challenge_2_msgs
+  kuri_mbzirc_challenge_2_tools
   pcl_ros
   pcl_conversions
   roscpp
@@ -24,10 +25,13 @@ find_package(PCL 1.7 REQUIRED)
 ## catkin specific configuration ##
 ###################################
 catkin_package(
-   CATKIN_DEPENDS roscpp
+   CATKIN_DEPENDS
+   roscpp
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS})
+#Not the cleanest way, but the only way I could include header files from *_tools package
+include_directories(../kuri_mbzirc_challenge_2_tools/include)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 

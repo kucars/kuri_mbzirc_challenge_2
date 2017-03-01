@@ -39,6 +39,9 @@ catkin_package(
 
 #include_directories(${catkin_INCLUDE_DIRS})
 include_directories(include ${catkin_INCLUDE_DIRS})
+#Not the cleanest way, but the only way I could include header files from *_tools package
+include_directories(../kuri_mbzirc_challenge_2_tools/include)
+
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 
@@ -58,4 +61,6 @@ add_executable(box_location src/box_location.cpp)
 target_link_libraries(box_location ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(box_location ${catkin_EXPORTED_TARGETS})
 
-
+add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp src/gps_conversion.cpp)
+target_link_libraries(test_gps_filter_velodyne ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(test_gps_filter_velodyne ${catkin_EXPORTED_TARGETS})
