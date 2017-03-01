@@ -1,0 +1,46 @@
+# Obtained from code, pushed in by .000100 inwards
+arena_gps_bounds:
+  corner1:
+    lat: 24.479427
+    lon: 54.612100
+  corner2:
+    lat: 24.479373
+    lon: 54.611440
+  corner3:
+    lat: 24.480000
+    lon: 54.611370
+  corner4:
+    lat: 24.480070
+    lon: 54.612000
+
+## Obtained from code
+#arena_gps_bounds:
+#  corner1:
+#    lat: 24.479327
+#    lon: 54.612200
+#  corner2:
+#    lat: 24.479273
+#    lon: 54.611340
+#  corner3:
+#    lat: 24.480100
+#    lon: 54.611220
+#  corner4:
+#    lat: 24.480170
+#    lon: 54.612077
+
+
+
+## Obtained from graphs
+#arena_gps_bounds:
+#  corner1:
+#    lat: 24.28760
+#    lon: 54.36730
+#  corner2:
+#    lat: 24.28755
+#    lon: 54.36680
+#  corner3:
+#    lat: 24.28800
+#    lon: 54.36680
+#  corner4:
+#    lat: 24.28810
+#    lon: 54.36725
