@@ -29,7 +29,7 @@
 
 #include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
 #include "../include/kuri_mbzirc_challenge_2_panel_detection/velodyne_box_detector.h"
-#include "utilities/pose_conversion.h"
+#include <kuri_mbzirc_challenge_2_tools/pose_conversion.h>
 
 #include <unistd.h>
 
