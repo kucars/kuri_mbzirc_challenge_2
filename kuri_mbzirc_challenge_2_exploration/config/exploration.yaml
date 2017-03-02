@@ -7,10 +7,10 @@ arena_gps_bounds:
     lat: 24.479373
     lon: 54.611440
   corner3:
-    lat: 24.480000
+    lat: 24.479900
     lon: 54.611370
   corner4:
-    lat: 24.480070
+    lat: 24.480000
     lon: 54.612000
 
 ## Obtained from code

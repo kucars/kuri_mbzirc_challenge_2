@@ -52,6 +52,7 @@ link_directories(${PCL_LIBRARY_DIRS})
 #  FILES_MATCHING PATTERN "*.h"
 #  PATTERN ".svn" EXCLUDE)
 
+add_library(pointcloud_gps_filter src/gps_conversion.cpp src/pointcloud_gps_filter.cpp)
 
 add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
 target_link_libraries(detection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
@@ -61,6 +62,6 @@ add_executable(box_location src/box_location.cpp)
 target_link_libraries(box_location ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(box_location ${catkin_EXPORTED_TARGETS})
 
-add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp src/gps_conversion.cpp)
-target_link_libraries(test_gps_filter_velodyne ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp)
+target_link_libraries(test_gps_filter_velodyne pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(test_gps_filter_velodyne ${catkin_EXPORTED_TARGETS})

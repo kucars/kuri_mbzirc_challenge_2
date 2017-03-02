@@ -96,7 +96,7 @@ int GPSHandler::projectGPSToCartesian(double goal_lat, double goal_lon, float *x
   double k = (fabs(c) < DBL_EPSILON) ? 1.0 : (c / sin(c));
 
   *x = k * (cos_lat_ * goal_sin_lat - sin_lat_ * goal_cos_lat * cos_d_lon) * CONSTANTS_RADIUS_OF_EARTH;
-  *y = k * goal_cos_lat * sin(goal_lon_rad - lon_rad_) * CONSTANTS_RADIUS_OF_EARTH;
+  *y = -k * goal_cos_lat * sin(goal_lon_rad - lon_rad_) * CONSTANTS_RADIUS_OF_EARTH;
 
   return 0;
 }

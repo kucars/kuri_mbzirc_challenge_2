@@ -30,6 +30,7 @@
 #include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
 
 #include <kuri_mbzirc_challenge_2_exploration/box_location.h>
+#include <kuri_mbzirc_challenge_2_tools/pose_conversion.h>
 
 #include <unistd.h>
 
@@ -126,47 +127,6 @@ int main(int argc, char **argv)
   return 0;
 }
 
-geometry_msgs::Quaternion getQuaternionFromYaw(double yaw)
-{
-  geometry_msgs::Quaternion quat;
-
-  tf::Quaternion tf_q;
-  tf_q = tf::createQuaternionFromYaw(yaw);
-
-  quat.x = tf_q.getX();
-  quat.y = tf_q.getY();
-  quat.z = tf_q.getZ();
-  quat.w = tf_q.getW();
-
-  return quat;
-}
-
-Eigen::Matrix4d convertStampedTransform2Matrix4d(tf::StampedTransform t)
-{
-  // Get translation
-  Eigen::Vector3d T1(
-      t.getOrigin().x(),
-      t.getOrigin().y(),
-      t.getOrigin().z()
-  );
-
-  // Get rotation matrix
-  tf::Quaternion qt = t.getRotation();
-  tf::Matrix3x3 R1(qt);
-
-  Eigen::Matrix3d R;
-  tf::matrixTFToEigen(R1,R);
-
-  // Set
-  Eigen::Matrix4d tf_eigen;
-  tf_eigen.setZero ();
-  tf_eigen.block (0, 0, 3, 3) = R;
-  tf_eigen.block (0, 3, 3, 1) = T1;
-  tf_eigen (3, 3) = 1;
-
-  return tf_eigen;
-}
-
 geometry_msgs::PoseArray computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double distance)
 {
   // Wait until we have odometry data
@@ -209,7 +169,7 @@ geometry_msgs::PoseArray computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
   p.position.y = dir.y * desired_length;
 
   double yaw = atan2(dir.y,dir.x);
-  p.orientation = getQuaternionFromYaw(yaw);
+  p.orientation = pose_conversion::getQuaternionFromYaw(yaw);
   pose_list.poses.push_back(p);
 
 

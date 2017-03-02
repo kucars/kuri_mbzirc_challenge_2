@@ -140,13 +140,11 @@ namespace pose_conversion{
     return R;
   }
 
-  static inline Eigen::Matrix4d getTransformationMatrix(geometry_msgs::Quaternion q_in)
+  static inline Eigen::Matrix4d getTransformationMatrix(Eigen::Matrix3d R)
   {
     Eigen::Matrix4d tf_eigen;
 
     Eigen::Vector3d T1(0, 0, 0);
-
-    Eigen::Matrix3d R = getRotationMatrix(q_in);
 
     // Set
     tf_eigen.setZero ();
