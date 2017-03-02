@@ -72,7 +72,7 @@ void callbackIMU(const sensor_msgs::Imu::ConstPtr& msg)
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "test_gps_filter_velodyne");
-  ros::NodeHandle node_handle("kuri_challenge2_exploration");
+  ros::NodeHandle node_handle("mbzirc_ch2_exploration");
 
   // Load parameters
   std::vector<GeoPoint> arena_bounds;

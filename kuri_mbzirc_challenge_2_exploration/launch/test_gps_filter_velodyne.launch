@@ -3,10 +3,13 @@
 <launch>
 
 
-  <!--- Run Move Base -->
-  <rosparam command="load" file="$(find kuri_mbzirc_challenge_2_exploration)/config/exploration.yaml" ns="kuri_challenge2_exploration"/>
+  <!--- Load parameters -->
+  <rosparam command="load" file="$(find kuri_mbzirc_challenge_2_exploration)/config/exploration.yaml" ns="mbzirc_ch2_exploration"/>
 
-  <!--- husky_waypoint_navigation node -->
-  <node name="test_gps_filter_velodyne" pkg="kuri_mbzirc_challenge_2_exploration" type="test_gps_filter_velodyne" output="screen" />
+  <!--- Box detector -->
+  <node name="velodyne_box_detector" pkg="kuri_mbzirc_challenge_2_exploration" type="velodyne_box_detector" output="screen" />
+
+  <!-- Box detector test client -->
+  <node name="test_velodyne_box_detection" pkg="kuri_mbzirc_challenge_2_exploration" type="test_velodyne_box_detection.py"/>
 
 </launch>

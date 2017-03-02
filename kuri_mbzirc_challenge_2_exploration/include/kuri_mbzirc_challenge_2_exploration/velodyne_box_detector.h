@@ -3,10 +3,17 @@
 
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
+#include <sensor_msgs/NavSatFix.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Imu.h>
 
+#include <pcl/point_types.h>
+#include <pcl/common/transforms.h>
 #include <pcl/common/common.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl_conversions/pcl_conversions.h>
 
+#include "../include/kuri_mbzirc_challenge_2_exploration/pointcloud_gps_filter.h"
 #include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
 
 
@@ -125,7 +132,11 @@ protected:
   std::vector<BoxCluster> cluster_list;
   PcCloudPtr pc_current_;
   PcCloudPtr pc_prev_;
+
+  PointcloudGpsFilter gps_filter_;
 public:
+  ros::Subscriber sub_gps;
+  ros::Subscriber sub_imu;
   ros::Subscriber sub_odom;
   ros::Subscriber sub_velo;
   ros::Publisher  pub_wall;
@@ -134,15 +145,17 @@ public:
   tf::TransformListener *tf_listener;
   nav_msgs::Odometry current_odom;
 
-  BoxPositionActionHandler(std::string name);
+  BoxPositionActionHandler(std::string name, std::vector<GeoPoint> bounds);
   ~BoxPositionActionHandler(){}
 
   // actionlib
   void executeCB(const GoalConstPtr &goal);
   void setSuccess(bool success = true);
 
-  void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
+  void callbackGPS(const sensor_msgs::NavSatFix::ConstPtr& msg);
+  void callbackIMU(const sensor_msgs::Imu::ConstPtr& msg);
   void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg);
+  void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg);
 
   void              computeBoundingBox(PcCloudPtrList& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<PcPoint> >& corners);
   PcCloudPtrList    getCloudClusters(PcCloudPtr cloud_ptr);

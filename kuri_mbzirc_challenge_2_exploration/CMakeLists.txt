@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   #husky_navigation
   #move_base
   kuri_mbzirc_challenge_2_msgs
+  kuri_mbzirc_challenge_2_tools
   pcl_ros
   pcl_conversions
   sensor_msgs
@@ -65,3 +66,7 @@ add_dependencies(box_location ${catkin_EXPORTED_TARGETS})
 add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp)
 target_link_libraries(test_gps_filter_velodyne pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(test_gps_filter_velodyne ${catkin_EXPORTED_TARGETS})
+
+add_executable(velodyne_box_detector src/velodyne_box_detector.cpp)
+target_link_libraries(velodyne_box_detector pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(velodyne_box_detector ${catkin_EXPORTED_TARGETS})
