@@ -1,133 +1,201 @@
-#include "ros/ros.h"
-#include <iostream>
-
-#include "geometry_msgs/Pose.h"
-#include "geometry_msgs/PoseArray.h"
-#include "sensor_msgs/PointCloud2.h"
-#include "sensor_msgs/LaserScan.h"
-#include "nav_msgs/Odometry.h"
-#include "visualization_msgs/Marker.h"
-
-#include <tf/transform_listener.h>
-#include <tf_conversions/tf_eigen.h>
-#include "velodyne_pointcloud/point_types.h"
-
-#include <laser_geometry/laser_geometry.h>
-
-#include <pcl/point_cloud.h>
-#include <pcl/common/common.h>
-#include <pcl/common/transforms.h>
-#include <pcl/features/normal_3d.h>
-#include <pcl/filters/extract_indices.h>
-#include <pcl/filters/voxel_grid.h>
-
-//#include <pcl/io/pcd_io.h>
-#include <pcl/segmentation/extract_clusters.h>
-#include <pcl/segmentation/sac_segmentation.h>
-#include <pcl_conversions/pcl_conversions.h>
-
-#include <actionlib/server/simple_action_server.h>
-#include <kuri_mbzirc_challenge_2_msgs/BoxPositionAction.h>
-
 #include <kuri_mbzirc_challenge_2_exploration/box_location.h>
-#include <kuri_mbzirc_challenge_2_tools/pose_conversion.h>
 
-#include <unistd.h>
-
-
-
-BoxPositionActionHandler::BoxPositionActionHandler(std::string name) :
-  as_(nh_, name, boost::bind(&BoxPositionActionHandler::executeCB, this, _1), false),
-  action_name_(name)
+BoxLocator::BoxLocator(actionlib::SimpleActionServer<ServerAction>* actionserver, bool bypass)
 {
-  is_node_enabled = false;
-  as_.start();
+  as_ = actionserver;
+  bypass_action_handler_ = bypass;
+
+  // Topic handlers
+  ros::NodeHandle node;
+
+  pub_wall_  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
+  pub_lines_ = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
+  pub_points_= node.advertise<visualization_msgs::Marker>("/explore/points", 10);
+  pub_poses_ = node.advertise<geometry_msgs::PoseArray>("/explore/poses", 10);
+
+  tf_listener_ = new tf::TransformListener();
+
+
+  // Run if bypassing actionlib
+  if (bypass_action_handler_)
+  {
+    callbacksEnable();
+    run();
+  }
 }
 
-void BoxPositionActionHandler::executeCB(const BoxPositionGoalConstPtr &goal)
-{
-  is_node_enabled = true;
 
-  // Enable callbacks
-  sub_velo  = nh_.subscribe("/velodyne_points", 1, callbackVelo);
-  sub_odom  = nh_.subscribe("/odometry/filtered", 1, callbackOdom);
+void BoxLocator::callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg)
+{
+  current_odom = *odom_msg;
+}
+
+
+void BoxLocator::callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
+{
+  // Convert msg to pointcloud
+  pcl::PointCloud<pcl::PointXYZ> cloud;
+  pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud;
+
+  pcl::fromROSMsg (*cloud_msg, cloud);
+  input_pointcloud = cloud.makeShared();
+
+
+  // Remove points that are too close or too far, or out of range
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
+
+  // Target roughly 40m either left, right or forward
+  double laser_min_range = 30;
+  double laser_max_range = 50;
+  double laser_min_angle = -M_PI/2;
+  double laser_max_angle = M_PI/2;
+
+
+  // Compute square of ranges
+  laser_min_range *= laser_min_range;
+  laser_max_range *= laser_max_range;
+  for (int i=0; i<input_pointcloud->points.size(); i++)
+  {
+    pcl::PointXYZ p = input_pointcloud->points[i];
+    double r = p.x*p.x + p.y*p.y;
+    if (r > laser_max_range || r < laser_min_range)
+      continue;
+
+    double angle = atan2(p.y, p.x);
+    if (angle > laser_max_angle || angle < laser_min_angle)
+      continue;
+
+    cloud_filtered->points.push_back (p);
+  }
+
+  /*
+  {
+    sensor_msgs::PointCloud2 cloud_cluster_msg;
+    pcl::toROSMsg(*cloud_filtered, cloud_cluster_msg);
+    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
+    cloud_cluster_msg.header.stamp = ros::Time::now();
+    pub_wall_.publish(cloud_cluster_msg);
+  }
+  */
+
+  if (cloud_filtered->points.size() == 0)
+  {
+    std::cout << "No laser points detected nearby.\n";
+    return;
+  }
+
+
+  // Get clusters
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector;
+  getCloudClusters(cloud_filtered ,pc_vector);
+
+
+  // Get size of each cluster
+  std::vector<Eigen::Vector3f> dimension_list;
+  std::vector<Eigen::Vector4f> centroid_list;
+  std::vector<std::vector<pcl::PointXYZ> > corners_list;
+  computeBoundingBox(pc_vector, dimension_list, centroid_list, corners_list);
+
+
+  // Only keep the clusters that are likely to be panels
+  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector_clustered;
+  for (int i = 0; i< dimension_list.size(); i++)
+  {
+    if (dimension_list[i][2] <= 1.5 && dimension_list[i][1] <= 1.5)
+      pc_vector_clustered.push_back(pc_vector[i]);
+  }
+
+
+  if (pc_vector_clustered.size() == 0)
+  {
+    std::cout << "Could not find panel cluster.\n";
+    //action_handler->setFailure();
+    return;
+  }
+
+  // Publish cluster clouds
+  for (int i=0; i<pc_vector_clustered.size(); i++)
+  {
+    sensor_msgs::PointCloud2 cloud_cluster_msg;
+    pcl::toROSMsg(*pc_vector_clustered[i], cloud_cluster_msg);
+    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
+    cloud_cluster_msg.header.stamp = ros::Time::now();
+    pub_wall_.publish(cloud_cluster_msg);
+
+    if (pc_vector_clustered.size() > 1)
+      usleep(200*1000);
+  }
+
+  /* Select one cloud */
+  if (pc_vector_clustered.size() > 1)
+  {
+    std::cout << "Found multiple panel clusters. Using the first one.\n";
+  }
+
+  pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud = pc_vector_clustered[0];
+
+
+  // Compute waypoint
+  waypoints_ = computeWaypoint(cluster_cloud, 4);
+
+  // Publish waypoints for visualization
+  waypoints_.header.frame_id = cloud_msg->header.frame_id;
+  pub_poses_.publish(waypoints_);
+
+  if(!bypass_action_handler_)
+    is_done_ = true;
+}
+
+
+void BoxLocator::callbacksEnable()
+{
+  sub_velo_  = nh_.subscribe("/velodyne_points", 1, &BoxLocator::callbackVelo, this);
+  sub_odom_  = nh_.subscribe("/odometry/filtered", 1, &BoxLocator::callbackOdom, this);
+}
+
+
+void BoxLocator::callbacksDisable()
+{
+  // Unsubscribe topic handlers
+  sub_velo_.shutdown();
+  sub_odom_.shutdown();
+}
+
+bool BoxLocator::run()
+{
+  ServerResult* dummy;
+  run(dummy);
+}
+
+bool BoxLocator::run(ServerResult* as_result)
+{
+  if (as_->isPreemptRequested())
+    return false;
+
+  is_done_ = false;
 
   ros::Rate r(30);
-  while (1)
+  while (!is_done_)
   {
-    // check that preempt has not been requested by the client
-    if (as_.isPreemptRequested() || !ros::ok())
-    {
-      // set the action state to preempted
-      as_.setPreempted();
-      break;
-    }
-
-    if (!is_node_enabled)
-    {
-      // set the action state to succeeded
-      as_.setSucceeded(result_);
-      break;
-    }
+    if (!ros::ok())
+      return false;
 
     ros::spinOnce();
     r.sleep();
   }
-}
-
-void BoxPositionActionHandler::setSuccess(geometry_msgs::PoseArray waypoints)
-{
-  // Unsubscribe topic handlers
-  sub_velo.shutdown();
-  sub_odom.shutdown();
-
-  // Set return message
-  is_node_enabled = false;
-
-  result_.success = true;
-  result_.waypoints = waypoints;
-}
-
-void BoxPositionActionHandler::setFailure()
-{
-  is_node_enabled = false;
-
-  result_.success = false;
-}
 
 
-int main(int argc, char **argv)
-{
-  ros::init(argc, argv, "box_location");
-  ros::NodeHandle node;
-
-  // Topic handlers
-  action_handler = new BoxPositionActionHandler(actionlib_topic);
-
-  pub_wall  = node.advertise<sensor_msgs::PointCloud2>("/explore/PCL", 10);
-  pub_lines = node.advertise<visualization_msgs::Marker>("/explore/HoughLines", 10);
-  pub_points= node.advertise<visualization_msgs::Marker>("/explore/points", 10);
-  pub_poses = node.advertise<geometry_msgs::PoseArray>("/explore/poses", 10);
-
-  tf_listener = new tf::TransformListener();
-
-  // Parse input
-  if (argc > 1)
+  if (!bypass_action_handler_)
   {
-    // Enable node without waiting for actionlib calls
-    bypass_action_handler = true;
-    std::cout << "Bypassing actionlib\n";
-  }
-  else
-  {
-    std::cout << "Waiting for messages on the \"" << actionlib_topic << "\" actionlib topic\n";
-  }
+    as_result->success = true;
+    as_result->waypoints = waypoints_;
 
-  ros::spin();
-  return 0;
+    callbacksDisable();
+  }
 }
 
-geometry_msgs::PoseArray computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double distance)
+
+geometry_msgs::PoseArray  BoxLocator::computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double distance)
 {
   // Wait until we have odometry data
   if (! &current_odom) //Check if pointer is null
@@ -176,139 +244,8 @@ geometry_msgs::PoseArray computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cl
   return pose_list;
 }
 
-void callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg)
-{
-  if (!action_handler->is_node_enabled && !bypass_action_handler)
-    return;
 
-  current_odom = *odom_msg;
-}
-
-void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
-{
-  if (!action_handler->is_node_enabled && !bypass_action_handler)
-  {
-    sub_velo.shutdown();
-    return;
-  }
-
-
-  // Convert msg to pointcloud
-  pcl::PointCloud<pcl::PointXYZ> cloud;
-  pcl::PointCloud<pcl::PointXYZ>::Ptr input_pointcloud;
-
-  pcl::fromROSMsg (*cloud_msg, cloud);
-  input_pointcloud = cloud.makeShared();
-
-
-  // Remove points that are too close or too far, or out of range
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_filtered (new pcl::PointCloud<pcl::PointXYZ>);
-
-  // Target roughly 40m either left, right or forward
-  double laser_min_range = 30;
-  double laser_max_range = 50;
-  double laser_min_angle = -M_PI/2;
-  double laser_max_angle = M_PI/2;
-
-
-  // Compute square of ranges
-  laser_min_range *= laser_min_range;
-  laser_max_range *= laser_max_range;
-  for (int i=0; i<input_pointcloud->points.size(); i++)
-  {
-    pcl::PointXYZ p = input_pointcloud->points[i];
-    double r = p.x*p.x + p.y*p.y;
-    if (r > laser_max_range || r < laser_min_range)
-      continue;
-
-    double angle = atan2(p.y, p.x);
-    if (angle > laser_max_angle || angle < laser_min_angle)
-      continue;
-
-    cloud_filtered->points.push_back (p);
-  }
-
-  /*
-  {
-    sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*cloud_filtered, cloud_cluster_msg);
-    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
-    cloud_cluster_msg.header.stamp = ros::Time::now();
-    pub_wall.publish(cloud_cluster_msg);
-  }
-  */
-
-  if (cloud_filtered->points.size() == 0)
-  {
-    std::cout << "No laser points detected nearby.\n";
-    action_handler->setFailure();
-    return;
-  }
-
-
-  // Get clusters
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector;
-  getCloudClusters(cloud_filtered ,pc_vector);
-
-
-  // Get size of each cluster
-  std::vector<Eigen::Vector3f> dimension_list;
-  std::vector<Eigen::Vector4f> centroid_list;
-  std::vector<std::vector<pcl::PointXYZ> > corners_list;
-  computeBoundingBox(pc_vector, dimension_list, centroid_list, corners_list);
-
-
-  // Only keep the clusters that are likely to be panels
-  std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> pc_vector_clustered;
-  for (int i = 0; i< dimension_list.size(); i++)
-  {
-    if (dimension_list[i][2] <= 1.5 && dimension_list[i][1] <= 1.5)
-      pc_vector_clustered.push_back(pc_vector[i]);
-  }
-
-
-  if (pc_vector_clustered.size() == 0)
-  {
-    std::cout << "Could not find panel cluster.\n";
-    action_handler->setFailure();
-    return;
-  }
-
-  // Publish cluster clouds
-  for (int i=0; i<pc_vector_clustered.size(); i++)
-  {
-    sensor_msgs::PointCloud2 cloud_cluster_msg;
-    pcl::toROSMsg(*pc_vector_clustered[i], cloud_cluster_msg);
-    cloud_cluster_msg.header.frame_id = cloud_msg->header.frame_id;
-    cloud_cluster_msg.header.stamp = ros::Time::now();
-    pub_wall.publish(cloud_cluster_msg);
-
-    if (pc_vector_clustered.size() > 1)
-      usleep(200*1000);
-  }
-
-  /* Select one cloud */
-  if (pc_vector_clustered.size() > 1)
-  {
-    std::cout << "Found multiple panel clusters. Using the first one.\n";
-  }
-
-  pcl::PointCloud<pcl::PointXYZ>::Ptr cluster_cloud = pc_vector_clustered[0];
-
-
-  // Compute waypoint
-  geometry_msgs::PoseArray waypoints;
-  waypoints = computeWaypoint(cluster_cloud, 4);
-
-  // Publish waypoints for visualization
-  waypoints.header.frame_id = cloud_msg->header.frame_id;
-  pub_poses.publish(waypoints);
-
-  action_handler->setSuccess(waypoints);
-
-}
-
-void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners)
+void BoxLocator::computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector,std::vector<Eigen::Vector3f>& dimension_list, std::vector<Eigen::Vector4f>& centroid_list, std::vector<std::vector<pcl::PointXYZ> >& corners)
 {
   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_plane (new pcl::PointCloud<pcl::PointXYZ> ());
   Eigen::Vector3f one_dimension;
@@ -380,7 +317,8 @@ void computeBoundingBox(std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vec
   }
 }
 
-void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id)
+
+void BoxLocator::drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id)
 {
   // Publish
   visualization_msgs::Marker marker_msg;
@@ -395,10 +333,11 @@ void drawPoints(std::vector<geometry_msgs::Point> points, std::string frame_id)
 
   marker_msg.points = points;
 
-  pub_points.publish(marker_msg);
+  pub_points_.publish(marker_msg);
 }
 
-std::vector<double> generateRange(double start, double end, double step)
+
+std::vector<double> BoxLocator::generateRange(double start, double end, double step)
 {
   std::vector<double> vec;
 
@@ -416,7 +355,8 @@ std::vector<double> generateRange(double start, double end, double step)
   return vec;
 }
 
-void getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector)
+
+void BoxLocator::getCloudClusters(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_ptr, std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr>& pc_vector)
 {
   // Creating the KdTree object for the search method of the extraction
   pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);

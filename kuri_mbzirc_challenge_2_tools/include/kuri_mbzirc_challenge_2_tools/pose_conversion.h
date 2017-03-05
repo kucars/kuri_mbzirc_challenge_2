@@ -1,3 +1,6 @@
+#ifndef KURI_MBZIRC_CHALLENGE_2_TOOLS_POSE_CONVERSION_H_
+#define KURI_MBZIRC_CHALLENGE_2_TOOLS_POSE_CONVERSION_H_
+
 #include <Eigen/Geometry>
 #include <geometry_msgs/Pose.h>
 #include <octomap/octomap.h>
@@ -252,3 +255,5 @@ namespace pose_conversion{
     return p;
   }
 }
+
+#endif

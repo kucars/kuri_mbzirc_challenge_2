@@ -59,9 +59,13 @@ add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
 target_link_libraries(detection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(detection ${catkin_EXPORTED_TARGETS})
 
-add_executable(box_location src/box_location.cpp)
-target_link_libraries(box_location ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-add_dependencies(box_location ${catkin_EXPORTED_TARGETS})
+add_executable(action_server_box_location src/box_location.cpp src/action_server_box_location.cpp)
+target_link_libraries(action_server_box_location pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+add_dependencies(action_server_box_location ${catkin_EXPORTED_TARGETS})
+
+#add_executable(box_location src/box_location.cpp)
+#target_link_libraries(box_location ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_dependencies(box_location ${catkin_EXPORTED_TARGETS})
 
 add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp)
 target_link_libraries(test_gps_filter_velodyne pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
