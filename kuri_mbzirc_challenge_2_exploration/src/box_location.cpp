@@ -27,7 +27,7 @@ BoxLocator::BoxLocator(actionlib::SimpleActionServer<ServerAction>* actionserver
 
 void BoxLocator::callbackOdom(const nav_msgs::Odometry::ConstPtr& odom_msg)
 {
-  current_odom = *odom_msg;
+  current_odom_ = *odom_msg;
 }
 
 
@@ -198,7 +198,7 @@ bool BoxLocator::run(ServerResult* as_result)
 geometry_msgs::PoseArray  BoxLocator::computeWaypoint(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud, double distance)
 {
   // Wait until we have odometry data
-  if (! &current_odom) //Check if pointer is null
+  if (! &current_odom_) //Check if pointer is null
   {
     ros::Rate r(30);
     ros::spinOnce();
