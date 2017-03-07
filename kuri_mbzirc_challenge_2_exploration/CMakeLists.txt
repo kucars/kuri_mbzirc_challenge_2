@@ -55,9 +55,9 @@ link_directories(${PCL_LIBRARY_DIRS})
 
 add_library(pointcloud_gps_filter src/gps_conversion.cpp src/pointcloud_gps_filter.cpp)
 
-add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
-target_link_libraries(detection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
-add_dependencies(detection ${catkin_EXPORTED_TARGETS})
+#add_executable(detection src/main.cpp src/detection.cpp src/panel_searching.cpp)
+#target_link_libraries(detection ${catkin_LIBRARIES} ${PCL_LIBRARIES})
+#add_dependencies(detection ${catkin_EXPORTED_TARGETS})
 
 add_executable(action_server_box_location src/box_location.cpp src/action_server_box_location.cpp)
 target_link_libraries(action_server_box_location pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
