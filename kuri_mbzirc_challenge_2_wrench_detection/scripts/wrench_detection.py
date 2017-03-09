@@ -214,6 +214,9 @@ class WrenchDetection:
         self.tool_ROI = RegionOfInterest()
         self.tool_pos = ObjectPose()
 
+        self.tool_pos.header.stamp.secs = self.camera_secs
+        self.tool_pos.header.stamp.nsecs = self.camera_nsecs
+
         WW=self.image_width
         HH=self.image_height
 
@@ -469,6 +472,7 @@ class WrenchDetection:
                     if toolIdentified:
 
                         self.tool_indx_vec = np.append(self.tool_indx_vec,tool_indx)  # is np.append memory an issue?
+                        self.tool_indx_vec = self.tool_indx_vec[-2*self.win_size:]
 
                         tool_indx_win = self.tool_indx_vec[-self.win_size:] 
                         hist, bin_edges = np.histogram(tool_indx_win,array([1, 2, 3, 4, 5, 6]), density=True)

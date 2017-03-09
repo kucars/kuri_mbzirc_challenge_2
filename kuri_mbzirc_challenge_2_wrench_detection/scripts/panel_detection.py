@@ -218,6 +218,13 @@ class PanelDetection:
         self.wrenches_pos = ObjectPose()
         self.valve_pos = ObjectPose()
 
+        self.panel_pos.header.stamp.secs = self.camera_secs
+        self.panel_pos.header.stamp.nsecs = self.camera_nsecs
+        self.wrenches_pos.header.stamp.secs = self.camera_secs
+        self.wrenches_pos.header.stamp.nsecs = self.camera_nsecs
+        self.valve_pos.header.stamp.secs = self.camera_secs
+        self.valve_pos.header.stamp.nsecs = self.camera_nsecs
+
         WW=self.image_width
         HH=self.image_height
 
