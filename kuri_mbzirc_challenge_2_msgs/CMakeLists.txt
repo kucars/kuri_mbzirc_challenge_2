@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     actionlib_msgs
     geometry_msgs
+    message_generation
   )
 
 add_action_files(
@@ -16,6 +17,11 @@ add_action_files(
     Huskynav.action
     PanelPosition.action
     WrenchDetection.action
+)
+
+add_message_files(
+  FILES
+  ObjectPose.msg
 )
 
 generate_messages(
@@ -31,6 +37,7 @@ generate_messages(
 catkin_package(
     CATKIN_DEPENDS
     actionlib_msgs
+    message_runtime
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS})
