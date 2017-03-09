@@ -23,20 +23,27 @@ PointcloudGpsFilter::PointcloudGpsFilter():
 }
 
 
-void PointcloudGpsFilter::filter (PcCloud::Ptr cloud_out)
+void PointcloudGpsFilter::filterBounds (PcCloud::Ptr cloud_out)
 {
   if (!isReady())
   {
     throw std::runtime_error("PointcloudGpsFilter not ready");
   }
 
-  // Get transformation (Yaw -> rotation matrix -> transformation matrix)
-  //Eigen::Matrix4d Ti = pose_conversion::getTransformationMatrix(ref_gps_quaternion_);
+  bool is_visualized = false;
 
+  // Get transformation (Yaw -> rotation matrix -> transformation matrix)
+  Eigen::Matrix3d R = pose_conversion::getRotationMatrix(ref_gps_quaternion_);
+  Eigen::Matrix4d Ti = pose_conversion::getTransformationMatrix(R);
+
+  /*
   double yaw = pose_conversion::getYawFromQuaternion(ref_gps_quaternion_);
   geometry_msgs::Quaternion q = pose_conversion::getQuaternionFromYaw(yaw);
   Eigen::Matrix3d R = pose_conversion::getRotationMatrix(q);
   Eigen::Matrix4d Ti = pose_conversion::getTransformationMatrix(R);
+
+  printf("Yaw: %lf\n", yaw);
+  */
 
   // Orient pointcloud towards north
   PcCloud::Ptr pc_rotated (new PcCloud);
@@ -55,6 +62,25 @@ void PointcloudGpsFilter::filter (PcCloud::Ptr cloud_out)
     bounds_cartesian.push_back(p);
   }
 
+  // Append bounds for visualization
+  if (is_visualized)
+  {
+    for (int b=0; b < bounds_cartesian.size(); b++)
+    {
+      PcPoint bp = bounds_cartesian[b];
+      for (int i=-2; i<=2; i++)
+      {
+        for (int j=-2; j<=2; j++)
+        {
+          PcPoint p;
+          p.x = bp.x + i*1.0;
+          p.y = bp.y + j*1.0;
+          cloud_out->points.push_back(p);
+        }
+      }
+    }
+  }
+
   // Check which points are within bounds
   for (int i=0; i < pc_->points.size(); i++)
   {
@@ -64,8 +90,8 @@ void PointcloudGpsFilter::filter (PcCloud::Ptr cloud_out)
     bool isWithinBounds = pointWithinBounds(bounds_cartesian, p);
     if (isWithinBounds)
     {
+      //cloud_out->points.push_back(p);
       cloud_out->points.push_back(pc_->points[i]);
-      //cloud_out->points.push_back(pc_rotated->points[i]);
     }
   }
 
@@ -77,6 +103,17 @@ GeoPoint PointcloudGpsFilter::getRefGPS()
   g.lat = ref_gps_.getLat();
   g.lon = ref_gps_.getLon();
   return g;
+}
+
+geometry_msgs::Quaternion PointcloudGpsFilter::getRefQuaternion()
+{
+  geometry_msgs::Quaternion q;
+  q.x = ref_gps_quaternion_.x;
+  q.y = ref_gps_quaternion_.y;
+  q.z = ref_gps_quaternion_.z;
+  q.w = ref_gps_quaternion_.w;
+
+  return q;
 }
 
 bool PointcloudGpsFilter::isReady()
@@ -124,6 +161,45 @@ bool PointcloudGpsFilter::pointWithinBounds (std::vector<PcPoint> bounds, PcPoin
   }
 
   return inside;
+}
+
+std::vector<std::string> PointcloudGpsFilter::readyStrings()
+{
+  std::vector<std::string> vec;
+  std::string str;
+
+  str = "GPS Bounds -- ";
+  if (ready_mask_ & 1)
+    str += "OK";
+  else
+    str += "NOT READY";
+  vec.push_back(str);
+
+
+  str = "GPS Cloud -- ";
+  if (ready_mask_ & 2)
+    str += "OK";
+  else
+    str += "NOT READY";
+  vec.push_back(str);
+
+
+  str = "GPS Reference -- ";
+  if (ready_mask_ & 4)
+    str += "OK";
+  else
+    str += "NOT READY";
+  vec.push_back(str);
+
+
+  str = "GPS Orientation -- ";
+  if (ready_mask_ & 8)
+    str += "OK";
+  else
+    str += "NOT READY";
+  vec.push_back(str);
+
+  return vec;
 }
 
 void PointcloudGpsFilter::setBounds(std::vector<GeoPoint> bounds)

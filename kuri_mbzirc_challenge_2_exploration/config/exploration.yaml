@@ -13,34 +13,23 @@ arena_gps_bounds:
     lat: 24.480000
     lon: 54.612000
 
-## Obtained from code
-#arena_gps_bounds:
-#  corner1:
-#    lat: 24.479327
-#    lon: 54.612200
-#  corner2:
-#    lat: 24.479273
-#    lon: 54.611340
-#  corner3:
-#    lat: 24.480100
-#    lon: 54.611220
-#  corner4:
-#    lat: 24.480170
-#    lon: 54.612077
+# Information to be used to filter out non-panels
+panel_information:
+  max_range: 50    # Distance from starting position
+  min_range: 30
+  max_height: 2.0  # Height of points from the ground
+  min_height: 0.2
+  min_width: 0.1   # Width of panel
+  max_width: 1.5
+  enable_filter: true
 
+filter_cluster_settings:
+  tolerance: 1.0         # Meters between points (big since we're sure the panel is far from other obstacles)
+  min_cluster_size: 3     # Number of points in a cluster
+  max_cluster_size: 5000
 
-
-## Obtained from graphs
-#arena_gps_bounds:
-#  corner1:
-#    lat: 24.28760
-#    lon: 54.36730
-#  corner2:
-#    lat: 24.28755
-#    lon: 54.36680
-#  corner3:
-#    lat: 24.28800
-#    lon: 54.36680
-#  corner4:
-#    lat: 24.28810
-#    lon: 54.36725
+occupancy_grid_settings:
+  resolution: 3.0
+  decay_rate: 0.95   # Zero to decay instantly, 1 to keep data indefinitely
+  prob_hit:   0.55    # Probabilty of an object being a panel if detected
+  prob_miss:  0.2    # Probabilty of an object being a panel if free space detected (during raycasting)

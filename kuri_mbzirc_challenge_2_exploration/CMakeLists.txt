@@ -28,7 +28,23 @@ find_package(catkin REQUIRED COMPONENTS
              ${${PROJECT_NAME}_CATKIN_DEPS} )
 
 #find_package(PCL REQUIRED)
+find_package(Boost REQUIRED)
+find_package(octomap REQUIRED)
 find_package(PCL 1.7 REQUIRED)
+
+
+# OCTOMAP_OMP = enable OpenMP parallelization (experimental, defaults to OFF)
+SET(OCTOMAP_OMP TRUE CACHE BOOL "Enable/disable OpenMP parallelization")
+IF(DEFINED ENV{OCTOMAP_OMP})
+  SET(OCTOMAP_OMP $ENV{OCTOMAP_OMP})
+ENDIF(DEFINED ENV{OCTOMAP_OMP})
+IF(OCTOMAP_OMP)
+  FIND_PACKAGE( OpenMP REQUIRED)
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+ENDIF(OCTOMAP_OMP)
+
 
 
 catkin_package(
@@ -43,8 +59,9 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 #Not the cleanest way, but the only way I could include header files from *_tools package
 include_directories(../kuri_mbzirc_challenge_2_tools/include)
 
-include_directories(${PCL_INCLUDE_DIRS})
+include_directories(${PCL_INCLUDE_DIRS} ${OCTOMAP_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
+link_libraries(${OCTOMAP_LIBRARIES})
 
 
 
@@ -70,6 +87,10 @@ add_dependencies(action_server_box_location ${catkin_EXPORTED_TARGETS})
 add_executable(test_gps_filter_velodyne src/test_gps_filter_velodyne.cpp)
 target_link_libraries(test_gps_filter_velodyne pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})
 add_dependencies(test_gps_filter_velodyne ${catkin_EXPORTED_TARGETS})
+
+add_executable(test_gps_occupancy src/test_gps_occupancy.cpp src/gps_occupancy.cpp)
+target_link_libraries(test_gps_occupancy pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES} ${OCTOMAP_LIBRARIES})
+add_dependencies(test_gps_occupancy ${catkin_EXPORTED_TARGETS})
 
 add_executable(velodyne_box_detector src/velodyne_box_detector.cpp)
 target_link_libraries(velodyne_box_detector pointcloud_gps_filter ${catkin_LIBRARIES} ${PCL_LIBRARIES})

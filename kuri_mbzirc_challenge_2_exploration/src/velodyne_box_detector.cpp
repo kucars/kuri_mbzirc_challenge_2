@@ -168,7 +168,7 @@ void   BoxPositionActionHandler::callbackVelo(const sensor_msgs::PointCloud2::Co
   }
 
   PcCloud::Ptr final_cloud (new PcCloud);
-  gps_filter_.filter(final_cloud);
+  gps_filter_.filterBounds(final_cloud);
 
 
   // =============

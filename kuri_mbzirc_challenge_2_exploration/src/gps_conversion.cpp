@@ -64,7 +64,7 @@ void GPSHandler::update(double lat_0, double lon_0, uint64_t timestamp)
   init_done_ = true;
 }
 
-bool GPSHandler::is_init()
+bool GPSHandler::isInit()
 {
   return init_done_;
 }

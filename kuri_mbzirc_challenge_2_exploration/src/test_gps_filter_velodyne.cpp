@@ -40,7 +40,7 @@ void callbackVelo(const sensor_msgs::PointCloud2::ConstPtr& cloud_msg)
   clock_t begin = clock();
 
   PcCloud::Ptr final_cloud (new PcCloud);
-  gps_filter.filter(final_cloud);
+  gps_filter.filterBounds(final_cloud);
 
   clock_t end = clock();
   double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;

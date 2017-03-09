@@ -12,18 +12,12 @@ typedef pcl::PointCloud<PcPoint>::Ptr PcCloudPtr;
 typedef std::vector<PcCloudPtr> PcCloudPtrList;
 
 
-struct GeoPoint
-{
-  double lat, lon;
-};
-
 class PointcloudGpsFilter
 {
 private:
   int ready_mask_;
 
   std::vector<GeoPoint> arena_bounds_;
-  GPSHandler ref_gps_;
   geometry_msgs::Quaternion ref_gps_quaternion_;
   PcCloud::Ptr pc_;
 
@@ -31,17 +25,23 @@ private:
   bool pointWithinBounds (std::vector<PcPoint> bounds, PcPoint p);
 
 public:
+  GPSHandler ref_gps_;
+
   PointcloudGpsFilter();
-  void filter(PcCloud::Ptr cloud_out);
+  void filterBounds(PcCloud::Ptr cloud_out);
 
   bool isReady();
+  std::vector<std::string> readyStrings();
 
   GeoPoint getRefGPS();
+  geometry_msgs::Quaternion getRefQuaternion();
 
   void setBounds(std::vector<GeoPoint> bounds);
   void setCloud(PcCloud::Ptr cloud_in);
   void setRefGPS(double lat, double lon, uint64_t timestamp);
   void setRefOrientation(geometry_msgs::Quaternion q);
+
+  //void transformCloudToCartesian();
 };
 
 

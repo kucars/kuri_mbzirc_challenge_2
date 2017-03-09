@@ -65,6 +65,11 @@
 #define CONSTANTS_ABSOLUTE_NULL_CELSIUS			  -273.15f		/* °C			*/
 #define CONSTANTS_RADIUS_OF_EARTH			        6371000			/* meters (m)		*/
 
+struct GeoPoint
+{
+  double lat, lon, heading;
+};
+
 class GPSHandler
 {
 private:
@@ -80,7 +85,7 @@ public:
    * Checks if global projection was initialized
    * @return true if map was initialized before, false else
    */
-  bool is_init();
+  bool isInit();
 
   /**
    * Initializes the global map transformation.
