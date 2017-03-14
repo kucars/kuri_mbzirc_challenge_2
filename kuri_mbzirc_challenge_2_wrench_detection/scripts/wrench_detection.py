@@ -88,7 +88,21 @@ class WrenchDetection:
 
         ## Initialize variables
         self.tool_size = '19mm'
-        
+
+        sizes = OrderedDict({
+            "16mm": (36, 200),
+            "17mm": (38, 205),
+            "18mm": (40, 215),
+            "19mm": (42, 230),
+            "20mm": (45, 240),
+            "21mm": (47, 250),
+            "22mm": (49, 260),
+            "23mm": (51, 270),
+            "24mm": (53, 280),
+            "25mm": (55, 290),
+            "26mm": (57, 300)})
+
+        """        
         sizes = OrderedDict({
             "15mm": (32.8, 200),
             "16mm": (33.9, 210),
@@ -102,6 +116,7 @@ class WrenchDetection:
             "24mm": (49.9, 290),
             "25mm": (51.2, 300),
             "26mm": (53.2, 310)})
+        """
         """
 
         sizes = OrderedDict({
