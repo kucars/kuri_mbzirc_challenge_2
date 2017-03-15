@@ -483,18 +483,18 @@ class WrenchDetection:
                 #print(detected_sizes)
 
 
-                if len(detected_sizes) == 6:
+                if len(detected_sizes) > 4 and len(detected_sizes) < 7 :
                     if toolIdentified:
 
                         self.tool_indx_vec = np.append(self.tool_indx_vec,tool_indx)  # is np.append memory an issue?
                         self.tool_indx_vec = self.tool_indx_vec[-2*self.win_size:]
 
                         tool_indx_win = self.tool_indx_vec[-self.win_size:] 
-                        hist, bin_edges = np.histogram(tool_indx_win,array([1, 2, 3, 4, 5, 6]), density=True)
+                        hist, bin_edges = np.histogram(tool_indx_win,array(range(1,len(detected_sizes)+1)), density=True)
 
                         self.right_tool_idx = np.argmax(hist)
                         self.confidence = hist[self.right_tool_idx]
-                        #print(tool_indx_win)
+                        #print(array(range(1,len(detected_sizes)+1)))
 
                     if self.right_tool_idx > 0 and len(self.tool_indx_vec) > self.win_size:      
                         (x_sub, y_sub, w_sub, h_sub) = cv2.boundingRect(wr_subcnts[self.right_tool_idx])
